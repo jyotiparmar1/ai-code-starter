@@ -1,0 +1,4 @@
+Employee Management System
+
+Employee should have:
+- Name and Department
