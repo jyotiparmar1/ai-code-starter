@@ -1,0 +1,15 @@
+package {{ package }}.entity;
+
+import jakarta.persistence.*;
+
+@Entity
+public class {{ entity.name }} {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    {% for field in entity.fields %}
+    private {{ field.type }} {{ field.name }};
+    {% endfor %}
+}
