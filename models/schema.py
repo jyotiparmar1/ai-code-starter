@@ -14,5 +14,6 @@ class API(BaseModel):
     method: str
 
 class ProjectSpec(BaseModel):
+    project_name: str
     entities: List[Entity]
     apis: List[API]
