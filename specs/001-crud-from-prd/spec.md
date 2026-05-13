@@ -8,6 +8,9 @@
 ## Clarifications
 
 - Q: When PRD CRUD requirements are ambiguous, should the system generate default scaffolding and include explicit inference documentation? → A: Generate default CRUD scaffolding and include a small metadata file describing inferred operations.
+- Q: Should the system use AI for feature extraction? → A: Yes, integrate LLM for automated technology stack inference from PRD text.
+- Q: What base path should REST controllers use? → A: Use `/api/` prefix for all controller endpoints.
+- Q: How to handle duplicate entity fields? → A: Prevent duplicate `id` field generation in templates.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -23,6 +26,7 @@ A product manager uploads a PRD containing entity definitions and CRUD requireme
 
 1. **Given** a PRD containing at least one entity and CRUD action descriptions, **When** the user uploads the document, **Then** the system returns a ZIP file containing a runnable Spring Boot starter project with controller, service, repository, and entity artifacts.
 2. **Given** a PRD that explicitly mentions create, read, update, or delete behavior for an entity, **When** the pipeline processes the document, **Then** the generated code includes corresponding CRUD method signatures or placeholders in the relevant templates.
+3. **Given** a PRD with technology requirements, **When** the system analyzes the text, **Then** AI automatically identifies and configures features like JWT auth, databases, and API documentation.
 
 ---
 
@@ -37,6 +41,21 @@ A product manager uploads a PRD describing several domain entities and the syste
 **Acceptance Scenarios**:
 
 1. **Given** a PRD that describes multiple entities and operations, **When** the document is processed, **Then** the generated output includes separate scaffolding for each identified entity.
+
+---
+
+### User Story 4 - Generate standardized REST API structure (Priority: P4)
+
+The system generates controllers with consistent `/api/` base paths and prevents duplicate field generation in entities.
+
+**Why this priority**: Ensures generated code follows REST conventions and avoids compilation errors.
+
+**Independent Test**: Verify generated controllers use `/api/` paths and entities don't have duplicate `id` fields.
+
+**Acceptance Scenarios**:
+
+1. **Given** any entity generation, **When** controllers are created, **Then** all endpoints start with `/api/`.
+2. **Given** entity definitions, **When** code is generated, **Then** no duplicate `id` fields appear in entity classes.
 
 ---
 
@@ -66,7 +85,8 @@ When the PRD is unclear about exact CRUD operations, the system applies sensible
 ### Functional Requirements
 
 - **FR-001**: The system MUST parse uploaded PRD documents and identify domain entities and CRUD operations described in natural language.
-- **FR-002**: The system MUST generate Spring Boot starter code for each identified entity, including controller, service, and repository components.
+- **FR-002**: The system MUST accept PRD uploads in plain text or `.docx` format and extract text correctly for analysis.
+- **FR-003**: The system MUST generate Spring Boot starter code for each identified entity, including controller, service, and repository components.
 - **FR-003**: The system MUST embed identified CRUD operations into generated templates so that create/read/update/delete behavior is represented in the output code.
 - **FR-004**: The system MUST produce a downloadable ZIP archive containing all generated Spring Boot source files and project metadata.
 - **FR-005**: The system MUST handle ambiguous PRD content by generating default scaffolding and documenting the inferred behavior for user review, for example via a metadata file such as `inference-summary.txt` or a README section.
@@ -89,6 +109,6 @@ When the PRD is unclear about exact CRUD operations, the system applies sensible
 ## Assumptions
 
 - The MVP focuses only on PRD documents; Jira and test case integration are planned for later phases.
-- Uploaded PRDs contain enough descriptive language to infer at least one domain entity and some operations.
+- Uploaded PRDs may be plain text or `.docx` documents and must contain enough descriptive language to infer at least one domain entity and some operations.
 - The project will continue to use Python + FastAPI for the backend and Jinja2 templates for code generation.
 - Generated code may require manual review after generation, especially when PRD language is vague or domain-specific.

@@ -1,7 +1,13 @@
 package {{ package }}.repository;
 
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import {{ package }}.entity.{{ entity.name }};
 
 public interface {{ entity.name }}Repository extends JpaRepository<{{ entity.name }}, Long> {
+    {% for op in entity.operations %}
+    {% if op.repository_method %}
+    List<{{ entity.name }}> {{ op.repository_method }}({{ op.repository_param.type }} {{ op.repository_param.name }});
+    {% endif %}
+    {% endfor %}
 }

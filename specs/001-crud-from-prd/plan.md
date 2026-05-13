@@ -5,12 +5,12 @@
 
 ## Summary
 
-Extend the existing parser → analyzer → generator pipeline so uploaded PRD files are analyzed for domain entities, fields, and CRUD intent. The analyzer will infer create/read/update/delete operations from natural-language PRD content and the generator will embed those operations into Spring Boot template scaffolding. The output remains a runnable Spring Boot starter project packaged as a ZIP archive.
+Extend the existing parser → analyzer → generator pipeline so uploaded PRD files are analyzed for domain entities, fields, and CRUD intent. The analyzer will infer create/read/update/delete operations from natural-language PRD content and the generator will embed those operations into Spring Boot template scaffolding. Additionally, integrate AI-driven feature extraction to automatically identify technology stack requirements (JWT, databases, etc.) from PRD text. The output remains a runnable Spring Boot starter project packaged as a ZIP archive with standardized `/api/` REST endpoints and clean entity definitions.
 
 ## Technical Context
 
 **Language/Version**: Python 3.x
-**Primary Dependencies**: FastAPI, requests, Jinja2, zipfile, OpenRouter API
+**Primary Dependencies**: FastAPI, requests, Jinja2, zipfile, python-docx, OpenRouter API
 **Storage**: Temporary local files for upload processing and output generation
 **Testing**: No automated test cases required for this phase; validation is limited to generated artifact structure and runnability
 **Target Platform**: Local development server; HTTP API for file uploads
@@ -28,6 +28,9 @@ Extend the existing parser → analyzer → generator pipeline so uploaded PRD f
 - Must generate runnable Spring Boot artifacts using Jinja2 templates. ✔
 - Must produce downloadable ZIP output. ✔
 - Must remain extensible for future MCP/JIRA/Test case integration. ✔
+- Must use AI for feature extraction from PRD text. ✔
+- Must generate standardized `/api/` REST endpoints. ✔
+- Must prevent duplicate field generation in entities. ✔
 
 ## Project Structure
 
@@ -57,15 +60,19 @@ templates/
 
 ## Implementation Approach
 
-1. Enhance `tools/analyzer.py` to infer CRUD operations and generate a richer JSON contract from PRD text.
-2. Update `tools/generator.py` to consume inferred operations and render them into `controller.java.j2`, `service.java.j2`, and other templates.
-3. Add output metadata documentation for ambiguous inferences, e.g. `inference-summary.txt` in the generated ZIP.
-4. Keep `main.py` and `orchestrator.py` as the pipeline entrypoints.
-5. Maintain the current ZIP packaging flow in `tools/generator.py`.
+1. Enhance `tools/parser.py` to support `.docx` PRD uploads and extract text for analysis.
+2. Enhance `tools/analyzer.py` to infer CRUD operations and generate a richer JSON contract from PRD text.
+3. Update `tools/generator.py` to consume inferred operations and render them into `controller.java.j2`, `service.java.j2`, and other templates.
+4. Integrate AI-driven feature extraction using LLM in `tools/features.py` for automated technology stack inference.
+5. Fix template issues: update controller base paths to `/api/`, prevent duplicate `id` fields, enhance operation normalization for custom endpoints.
+6. Add output metadata documentation for ambiguous inferences, e.g. `inference-summary.txt` in the generated ZIP.
+7. Keep `main.py` and `orchestrator.py` as the pipeline entrypoints.
+8. Maintain the current ZIP packaging flow in `tools/generator.py`.
 
 ## Dependencies & Notes
 
 - This phase depends on the OpenRouter API for PRD interpretation.
+- The parser also depends on `python-docx` to support `.docx` uploads.
 - No additional persistence layer is required.
 - Because no tests are required, the focus is on end-to-end artifact completeness rather than automated coverage.
 

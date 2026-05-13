@@ -1,0 +1,38 @@
+Project: TaskManagement
+
+=== DETECTED FEATURES ===
+LLM identified: jwt_auth, role_based_access, database_postgresql, validation, error_handling, api_documentation
+
+Enabled Features:
+  - jwt_auth
+  - role_based_access
+  - database_postgresql
+  - validation
+  - error_handling
+  - api_documentation
+
+=== INFERRED ENTITIES AND OPERATIONS ===
+- Entity: User
+  Fields: username:String, email:String, password:String, createdDate:String, lastLogin:String, role:String
+  - CREATE POST /users: Create a new user
+  - READ GET /users: List all users
+  - READ GET /users/{id}: Get user by ID
+  - UPDATE PUT /users/{id}: Update user details
+  - DELETE DELETE /users/{id}: Remove a user
+
+- Entity: Project
+  Fields: projectName:String, description:String, owner:String, createdDate:String, status:String, teamMembers:String
+  - CREATE POST /projects: Create a new project
+  - READ GET /projects: List all projects
+  - READ GET /projects/{id}: Get project by ID
+  - UPDATE PUT /projects/{id}: Update project details
+  - DELETE DELETE /projects/{id}: Remove a project
+
+- Entity: Task
+  Fields: title:String, description:String, assignedTo:String, projectId:String, status:String, priority:String, dueDate:String, createdDate:String, updatedDate:String, comments:String
+  - CREATE POST /tasks: Create a new task
+  - READ GET /tasks: List all tasks
+  - READ GET /tasks/{id}: Get task by ID
+  - UPDATE PUT /tasks/{id}: Update task details
+  - DELETE DELETE /tasks/{id}: Remove a task
+

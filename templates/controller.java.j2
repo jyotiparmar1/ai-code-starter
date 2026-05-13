@@ -1,8 +1,47 @@
 package {{ package }}.controller;
 
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
+import {{ package }}.service.{{ entity.name }}Service;
+import {{ package }}.entity.{{ entity.name }};
 
 @RestController
-@RequestMapping("/{{ entity.name | lower }}s")
+@RequestMapping("/api/{{ entity.name | lower }}s")
 public class {{ entity.name }}Controller {
+
+    private final {{ entity.name }}Service service;
+
+    public {{ entity.name }}Controller({{ entity.name }}Service service) {
+        this.service = service;
+    }
+
+    {% for op in entity.operations %}
+    {% set mapping_path = op.relative_path if op.relative_path != '/' else '' %}
+    {% set params = op.params or [] %}
+    {% if op.type == 'CREATE' %}
+    @PostMapping("{{ mapping_path }}")
+    public {{ op.return_type }} {{ op.method_name }}({% for p in params %}{{ p.annotation }} {% if p.annotation == '@PathVariable' and p.path_variable_name != p.name %}("{{ p.path_variable_name }}") {% endif %}{{ p.type }} {{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
+        return service.{{ op.method_name }}({% for p in params %}{{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %});
+    }
+
+    {% elif op.type == 'READ' %}
+    @GetMapping("{{ mapping_path }}")
+    public {{ op.return_type }} {{ op.method_name }}({% for p in params %}{{ p.annotation }} {% if p.annotation == '@PathVariable' and p.path_variable_name != p.name %}("{{ p.path_variable_name }}") {% endif %}{{ p.type }} {{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
+        return service.{{ op.method_name }}({% for p in params %}{{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %});
+    }
+
+    {% elif op.type == 'UPDATE' %}
+    @PutMapping("{{ mapping_path }}")
+    public {{ op.return_type }} {{ op.method_name }}({% for p in params %}{{ p.annotation }} {% if p.annotation == '@PathVariable' and p.path_variable_name != p.name %}("{{ p.path_variable_name }}") {% endif %}{{ p.type }} {{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
+        return service.{{ op.method_name }}({% for p in params %}{{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %});
+    }
+
+    {% elif op.type == 'DELETE' %}
+    @DeleteMapping("{{ mapping_path }}")
+    public void {{ op.method_name }}({% for p in params %}{{ p.annotation }} {% if p.annotation == '@PathVariable' and p.path_variable_name != p.name %}("{{ p.path_variable_name }}") {% endif %}{{ p.type }} {{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
+        service.{{ op.method_name }}({% for p in params %}{{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %});
+    }
+
+    {% endif %}
+    {% endfor %}
 }

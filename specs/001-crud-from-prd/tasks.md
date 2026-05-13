@@ -15,6 +15,7 @@ description: "Task list for implementing PRD CRUD inference and runnable Spring 
 - [ ] T001 Create `specs/001-crud-from-prd/tasks.md` to document feature implementation work
 - [ ] T002 Review `main.py`, `orchestrator.py`, and `tools/` to confirm the parser → analyzer → generator pipeline structure
 - [ ] T003 Confirm Spring Boot code templates exist in `templates/` and cover `Application.java`, `pom.xml`, `application.properties`, entity, repository, service, and controller artifacts
+- [ ] T004 Add `.docx` PRD support to `tools/parser.py` using `python-docx`, while preserving plain text parsing behavior
 
 ---
 
@@ -27,6 +28,18 @@ description: "Task list for implementing PRD CRUD inference and runnable Spring 
 - [ ] T006 Extend `templates/controller.java.j2` and `templates/service.java.j2` to render inferred CRUD methods from `entity.operations`
 - [ ] T007 Add generation of an inference metadata file in `tools/generator.py`, such as `inference-summary.txt`, into `output/project/`
 - [ ] T008 Ensure `tools/generator.py` still writes `Application.java`, `application.properties`, `pom.xml`, and packages `output/project.zip`
+
+---
+
+## Phase 2.5: AI Enhancement & Template Fixes
+
+**Purpose**: Integrate AI-driven feature extraction and fix template issues for better automation.
+
+- [X] T027 Integrate LLM for automated feature extraction from PRD text in `tools/features.py`
+- [X] T028 Update controller templates to use `/api/` base path for REST endpoints
+- [X] T029 Fix duplicate `id` field generation in entity templates
+- [X] T030 Enhance operation normalization for custom endpoints with path variables
+- [X] T031 Update service/repository templates for dynamic operation rendering
 
 ---
 

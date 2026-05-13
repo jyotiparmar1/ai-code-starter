@@ -9,7 +9,29 @@ public class {{ entity.name }} {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    {% for field in entity.fields %}
+    {% for field in entity.fields if field.name != 'id' %}
     private {{ field.type }} {{ field.name }};
+    {% endfor %}
+
+    public {{ entity.name }}() {
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    {% for field in entity.fields if field.name != 'id' %}
+    public {{ field.type }} get{{ field.method_name }}() {
+        return {{ field.name }};
+    }
+
+    public void set{{ field.method_name }}({{ field.type }} {{ field.name }}) {
+        this.{{ field.name }} = {{ field.name }};
+    }
+
     {% endfor %}
 }

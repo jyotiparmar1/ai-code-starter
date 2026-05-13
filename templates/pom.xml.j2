@@ -15,6 +15,7 @@
 
     <dependencies>
 
+        <!-- Core Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -25,11 +26,21 @@
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
+        <!-- In-memory database (default) -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- Dynamic Dependencies from Inferred Features -->
+{% for dep in dependencies %}
+        <dependency>
+            <groupId>{{ dep.split(':')[0] }}</groupId>
+            <artifactId>{{ dep.split(':')[1] }}</artifactId>
+            {% if ':' in dep and dep.count(':') >= 2 %}<version>{{ dep.split(':')[2] }}</version>{% endif %}
+        </dependency>
+{% endfor %}
 
     </dependencies>
 
