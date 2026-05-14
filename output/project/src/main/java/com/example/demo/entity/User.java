@@ -12,9 +12,15 @@ public class User {
     
     private String username;
     
+    private String email;
+    
     private String password;
     
-    private String employee;
+    private String createddate;
+    
+    private String lastlogin;
+    
+    private String role;
     
 
     public User() {
@@ -38,6 +44,15 @@ public class User {
     }
 
     
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    
     public String getPassword() {
         return password;
     }
@@ -47,12 +62,30 @@ public class User {
     }
 
     
-    public String getEmployee() {
-        return employee;
+    public String getCreateddate() {
+        return createddate;
     }
 
-    public void setEmployee(String employee) {
-        this.employee = employee;
+    public void setCreateddate(String createddate) {
+        this.createddate = createddate;
+    }
+
+    
+    public String getLastlogin() {
+        return lastlogin;
+    }
+
+    public void setLastlogin(String lastlogin) {
+        this.lastlogin = lastlogin;
+    }
+
+    
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 
     

@@ -2,9 +2,9 @@ package com.example.demo.repository;
 
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
-import com.example.demo.entity.Department;
+import com.example.demo.entity.Project;
 
-public interface DepartmentRepository extends JpaRepository<Department, Long> {
+public interface ProjectRepository extends JpaRepository<Project, Long> {
     
     
     

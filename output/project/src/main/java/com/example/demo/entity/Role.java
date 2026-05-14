@@ -1,6 +1,9 @@
 package com.example.demo.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 
 @Entity
 public class Role {
@@ -9,14 +12,7 @@ public class Role {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    
     private String name;
-    
-    private String users;
-    
-
-    public Role() {
-    }
 
     public Long getId() {
         return id;
@@ -26,7 +22,6 @@ public class Role {
         this.id = id;
     }
 
-    
     public String getName() {
         return name;
     }
@@ -34,15 +29,4 @@ public class Role {
     public void setName(String name) {
         this.name = name;
     }
-
-    
-    public String getUsers() {
-        return users;
-    }
-
-    public void setUsers(String users) {
-        this.users = users;
-    }
-
-    
 }

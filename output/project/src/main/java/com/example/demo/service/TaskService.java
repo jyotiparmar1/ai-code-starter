@@ -2,41 +2,41 @@ package com.example.demo.service;
 
 import java.util.List;
 import org.springframework.stereotype.Service;
-import com.example.demo.entity.Role;
-import com.example.demo.repository.RoleRepository;
+import com.example.demo.entity.Task;
+import com.example.demo.repository.TaskRepository;
 
 @Service
-public class RoleService {
+public class TaskService {
 
-    private final RoleRepository repository;
+    private final TaskRepository repository;
 
-    public RoleService(RoleRepository repository) {
+    public TaskService(TaskRepository repository) {
         this.repository = repository;
     }
 
     
-    public Role createRole(Role payload) {
+    public Task createTask(Task payload) {
         
         return repository.save(payload);
         
     }
 
     
-    public List<Role> getAllRoles() {
+    public List<Task> getAllTasks() {
         
         return repository.findAll();
         
     }
 
     
-    public Role getRoleById(Long id) {
+    public Task getTaskById(Long id) {
         
         return repository.findById(id).orElse(null);
         
     }
 
     
-    public Role updateRole(Long id, Role payload) {
+    public Task updateTask(Long id, Task payload) {
         
         payload.setId(id);
         return repository.save(payload);
@@ -44,7 +44,7 @@ public class RoleService {
     }
 
     
-    public void deleteRole(Long id) {
+    public void deleteTask(Long id) {
         
         repository.deleteById(id);
         

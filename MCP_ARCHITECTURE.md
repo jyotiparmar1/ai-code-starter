@@ -192,6 +192,10 @@ curl http://localhost:8000/health
 5. **Backward Compatible**: Existing `/generate` endpoint still works
 6. **Tool Discovery**: `/mcp/tools` endpoint lists all available tools
 
+
+
+
+
 ## Future Enhancements
 
 ### Multi-Tool Extension

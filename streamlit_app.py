@@ -4,6 +4,9 @@ import zipfile
 import io
 import os
 import tempfile
+from docx import Document
+from PyPDF2 import PdfReader
+import io
 
 # Configure page
 st.set_page_config(
@@ -43,6 +46,7 @@ def call_api(endpoint: str, method: str = "GET", data: dict = None, files: dict 
         return None
 
 def main():
+
     st.title("🚀 AI Code Generator")
     st.markdown("Generate Spring Boot applications from Product Requirements Documents (PRDs)")
 
@@ -63,20 +67,85 @@ def main():
             prd_text = st.text_area(
                 "Enter your Product Requirements Document:",
                 height=300,
-                placeholder="Describe your application requirements here...\n\nExample:\nCreate a user management system with login, registration, and profile management features. Users should have name, email, and role fields."
+                placeholder="""Describe your application requirements here...
+
+    Example:
+    Create a user management system with login, registration, and profile management features.
+    Users should have name, email, and role fields."""
             )
+
         else:
             uploaded_file = st.file_uploader(
                 "Upload PRD document:",
-                type=["txt", "md", "pdf"],
-                help="Upload a text file containing your PRD"
+                type=["txt", "md", "docx", "doc", "pdf"],
+                help="Upload a PRD document"
             )
+
             if uploaded_file:
-                if uploaded_file.type == "application/pdf":
-                    st.warning("PDF parsing not implemented yet. Please use text input or convert to text file.")
-                else:
-                    prd_text = uploaded_file.read().decode("utf-8")
-                    st.text_area("File content preview:", prd_text[:500] + "..." if len(prd_text) > 500 else prd_text, height=200, disabled=True)
+
+                file_type = uploaded_file.name.split(".")[-1].lower()
+
+                try:
+                    # TXT / MD
+                    if file_type in ["txt", "md"]:
+
+                        file_bytes = uploaded_file.read()
+
+                        encodings = ["utf-8", "utf-16", "latin-1", "cp1252"]
+
+                        for encoding in encodings:
+                            try:
+                                prd_text = file_bytes.decode(encoding)
+                                break
+                            except UnicodeDecodeError:
+                                continue
+
+                        if not prd_text:
+                            st.error("Could not decode text file. Please use UTF-8 encoded files.")
+
+                    # DOCX
+                    elif file_type == "docx":
+                        doc = Document(uploaded_file)
+
+                        paragraphs = []
+                        for para in doc.paragraphs:
+                            paragraphs.append(para.text)
+
+                        prd_text = "\n".join(paragraphs)
+
+                    # PDF
+                    elif file_type == "pdf":
+                        pdf_reader = PdfReader(uploaded_file)
+
+                        text = []
+                        for page in pdf_reader.pages:
+                            extracted = page.extract_text()
+                            if extracted:
+                                text.append(extracted)
+
+                        prd_text = "\n".join(text)
+
+                    # DOC (legacy Word format)
+                    elif file_type == "doc":
+                        st.warning(
+                            ".doc format is not fully supported. "
+                            "Please convert it to .docx for best results."
+                        )
+
+                    else:
+                        st.error("Unsupported file type.")
+
+                    # Preview content
+                    if prd_text:
+                        st.text_area(
+                            "File content preview:",
+                            prd_text[:500] + "..." if len(prd_text) > 500 else prd_text,
+                            height=200,
+                            disabled=True
+                        )
+
+                except Exception as e:
+                    st.error(f"Error reading file: {str(e)}")
 
         # Generate button
         if st.button("🚀 Generate Code", type="primary", use_container_width=True):
@@ -89,12 +158,12 @@ def main():
                 context_result = call_api("/mcp/context", "POST", {"requirements": prd_text})
                 if context_result:
                     context = context_result.get("context", "").strip()
-                    if context:
-                        st.success("✅ MCP context loaded")
-                        with st.expander("MCP Context overview", expanded=False):
-                            st.write(context)
-                    else:
-                        st.warning("MCP did not return context text.")
+                    # if context:
+                    #     st.success("✅ MCP context loaded")
+                    #     with st.expander("MCP Context overview", expanded=False):
+                    #         st.write(context)
+                    # else:
+                    #     st.warning("MCP did not return context text.")
 
             with st.spinner("⚙️ Generating Spring Boot application..."):
                 # Create temporary file for API
