@@ -2,41 +2,41 @@ package com.example.demo.service;
 
 import java.util.List;
 import org.springframework.stereotype.Service;
-import com.example.demo.entity.Project;
-import com.example.demo.repository.ProjectRepository;
+import com.example.demo.entity.Department;
+import com.example.demo.repository.DepartmentRepository;
 
 @Service
-public class ProjectService {
+public class DepartmentService {
 
-    private final ProjectRepository repository;
+    private final DepartmentRepository repository;
 
-    public ProjectService(ProjectRepository repository) {
+    public DepartmentService(DepartmentRepository repository) {
         this.repository = repository;
     }
 
     
-    public Project createProject(Project payload) {
+    public Department createDepartment(Department payload) {
         
         return repository.save(payload);
         
     }
 
     
-    public List<Project> getAllProjects() {
+    public List<Department> getAllDepartments() {
         
         return repository.findAll();
         
     }
 
     
-    public Project getProjectById(Long id) {
+    public Department getDepartmentById(Long id) {
         
         return repository.findById(id).orElse(null);
         
     }
 
     
-    public Project updateProject(Long id, Project payload) {
+    public Department updateDepartment(Long id, Department payload) {
         
         payload.setId(id);
         return repository.save(payload);
@@ -44,7 +44,7 @@ public class ProjectService {
     }
 
     
-    public void deleteProject(Long id) {
+    public void deleteDepartment(Long id) {
         
         repository.deleteById(id);
         

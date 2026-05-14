@@ -10,6 +10,7 @@ OPENROUTER_API_KEY = os.getenv(
 )
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = "poolside/laguna-m.1:free"
+OPENROUTER_TIMEOUT = int(os.getenv("OPENROUTER_TIMEOUT", "45"))
 
 def extract_json_from_response(content: str) -> dict:
     """Extract JSON from response, handling markdown code blocks."""
@@ -147,14 +148,30 @@ def clean_analyzer_output(data: dict, raw_prd_text: str = "") -> dict:
     }
 
 
-def analyze(text: str) -> dict:
+def analyze(text: str, project_name: str = None) -> dict:
+    # Get enhanced context from MCP server
+    try:
+        from .mcp_server import get_spring_boot_context
+        mcp_context = get_spring_boot_context(text)
+        context_info = f"\nAdditional Context from MCP:\n{mcp_context}\n"
+    except Exception:
+        # Fallback if MCP server is not available
+        context_info = "\nUsing standard Spring Boot best practices.\n"
+
+    if project_name and isinstance(project_name, str):
+        project_prompt = f"Project name: {project_name}\n"
+    else:
+        project_prompt = ""
+    
     prompt = f"""
 You are a senior Spring Boot architect.
 Analyze the PRD for domain entities, fields, and CRUD operations.
 Return STRICT JSON ONLY with no explanatory text.
 
 PRD:
-{text}
+{project_prompt}{text}
+
+{context_info}
 
 JSON FORMAT:
 {{
@@ -169,9 +186,9 @@ JSON FORMAT:
       "operations": [
         {{"type": "CREATE", "method": "POST", "endpoint": "/employees", "description": "Create a new employee"}},
         {{"type": "READ", "method": "GET", "endpoint": "/employees", "description": "List all employees"}},
-        {{"type": "READ", "method": "GET", "endpoint": "/employees/{id}", "description": "Get employee by ID"}},
-        {{"type": "UPDATE", "method": "PUT", "endpoint": "/employees/{id}", "description": "Update employee details"}},
-        {{"type": "DELETE", "method": "DELETE", "endpoint": "/employees/{id}", "description": "Remove an employee"}}
+        {{"type": "READ", "method": "GET", "endpoint": "/employees/{{id}}", "description": "Get employee by ID"}},
+        {{"type": "UPDATE", "method": "PUT", "endpoint": "/employees/{{id}}", "description": "Update employee details"}},
+        {{"type": "DELETE", "method": "DELETE", "endpoint": "/employees/{{id}}", "description": "Remove an employee"}}
       ]
     }}
   ]
@@ -192,9 +209,37 @@ JSON FORMAT:
     if not text.strip():
         raise ValueError("Cannot generate JSON from empty requirement text.")
 
-    response = requests.post(OPENROUTER_BASE_URL, headers=headers, json=payload)
-    response.raise_for_status()
+    try:
+        response = requests.post(
+            OPENROUTER_BASE_URL,
+            headers=headers,
+            json=payload,
+            timeout=OPENROUTER_TIMEOUT
+        )
+        response.raise_for_status()
+    except requests.exceptions.Timeout as exc:
+        data = {
+            "inference_notes": [
+                f"OpenRouter request timed out after {OPENROUTER_TIMEOUT} seconds. Falling back to default entity extraction."
+            ]
+        }
+    except requests.exceptions.RequestException as exc:
+        data = {
+            "inference_notes": [
+                f"OpenRouter request failed: {str(exc)}. Falling back to default entity extraction."
+            ]
+        }
+    else:
+        content = response.json()["choices"][0]["message"]["content"]
+        try:
+            data = extract_json_from_response(content)
+        except ValueError as exc:
+            data = {
+                "inference_notes": [
+                    f"OpenRouter returned invalid JSON: {str(exc)}. Falling back to default entity extraction."
+                ]
+            }
 
-    content = response.json()["choices"][0]["message"]["content"]
-    data = extract_json_from_response(content)
+    if project_name and isinstance(project_name, str):
+        data["project_name"] = project_name
     return clean_analyzer_output(data, raw_prd_text=text)

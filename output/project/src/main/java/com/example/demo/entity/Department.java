@@ -3,7 +3,7 @@ package com.example.demo.entity;
 import jakarta.persistence.*;
 
 @Entity
-public class Role {
+public class Department {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -12,10 +12,12 @@ public class Role {
     
     private String name;
     
-    private String users;
+    private String budget;
+    
+    private String head;
     
 
-    public Role() {
+    public Department() {
     }
 
     public Long getId() {
@@ -36,12 +38,21 @@ public class Role {
     }
 
     
-    public String getUsers() {
-        return users;
+    public String getBudget() {
+        return budget;
     }
 
-    public void setUsers(String users) {
-        this.users = users;
+    public void setBudget(String budget) {
+        this.budget = budget;
+    }
+
+    
+    public String getHead() {
+        return head;
+    }
+
+    public void setHead(String head) {
+        this.head = head;
     }
 
     

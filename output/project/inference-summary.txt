@@ -1,38 +1,49 @@
-Project: TaskManagement
+Project: prd
 
 === DETECTED FEATURES ===
-LLM identified: jwt_auth, role_based_access, database_postgresql, validation, error_handling, api_documentation
+LLM identified: jwt_auth, role_based_access, database_mysql, database_postgresql, logging, api_documentation, validation, error_handling, actuator
 
 Enabled Features:
   - jwt_auth
   - role_based_access
+  - database_mysql
   - database_postgresql
+  - logging
+  - api_documentation
   - validation
   - error_handling
-  - api_documentation
+  - actuator
 
 === INFERRED ENTITIES AND OPERATIONS ===
+- Entity: Employee
+  Fields: id:Long, firstname:String, lastname:String, email:String, phonenumber:String, jobtitle:String, hiredate:String, salary:String, isactive:Boolean, department:String, manager:String
+  - CREATE POST /api/employees: Create a new employee
+  - READ GET /api/employees: List all employees
+  - READ GET /api/employees/{id}: Get employee by ID
+  - UPDATE PUT /api/employees/{id}: Update employee details
+  - DELETE DELETE /api/employees/{id}: Deactivate an employee
+
+- Entity: Department
+  Fields: id:Long, name:String, budget:String, head:String
+  - CREATE POST /api/departments: Create a new department
+  - READ GET /api/departments: List all departments
+  - READ GET /api/departments/{id}: Get department by ID
+  - UPDATE PUT /api/departments/{id}: Update department details
+  - DELETE DELETE /api/departments/{id}: Delete a department
+
 - Entity: User
-  Fields: username:String, email:String, password:String, createdDate:String, lastLogin:String, role:String
-  - CREATE POST /users: Create a new user
-  - READ GET /users: List all users
-  - READ GET /users/{id}: Get user by ID
-  - UPDATE PUT /users/{id}: Update user details
-  - DELETE DELETE /users/{id}: Remove a user
+  Fields: id:Long, username:String, password:String, employee:String
+  - CREATE POST /api/users: Create a new user
+  - READ GET /api/users: List all users
+  - READ GET /api/users/{id}: Get user by ID
+  - UPDATE PUT /api/users/{id}: Update user details
+  - DELETE DELETE /api/users/{id}: Delete a user
 
-- Entity: Project
-  Fields: projectName:String, description:String, owner:String, createdDate:String, status:String, teamMembers:String
-  - CREATE POST /projects: Create a new project
-  - READ GET /projects: List all projects
-  - READ GET /projects/{id}: Get project by ID
-  - UPDATE PUT /projects/{id}: Update project details
-  - DELETE DELETE /projects/{id}: Remove a project
-
-- Entity: Task
-  Fields: title:String, description:String, assignedTo:String, projectId:String, status:String, priority:String, dueDate:String, createdDate:String, updatedDate:String, comments:String
-  - CREATE POST /tasks: Create a new task
-  - READ GET /tasks: List all tasks
-  - READ GET /tasks/{id}: Get task by ID
-  - UPDATE PUT /tasks/{id}: Update task details
-  - DELETE DELETE /tasks/{id}: Remove a task
+- Entity: Role
+  Fields: id:Long, name:String, users:String
+  - CREATE POST /api/roles: Create a new role
+  - READ GET /api/roles: List all roles
+  - READ GET /api/roles/{id}: Get role by ID
+  - UPDATE PUT /api/roles/{id}: Update role details
+  - DELETE DELETE /api/roles/{id}: Delete a role
 

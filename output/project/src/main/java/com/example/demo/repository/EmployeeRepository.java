@@ -2,9 +2,9 @@ package com.example.demo.repository;
 
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
-import com.example.demo.entity.Task;
+import com.example.demo.entity.Employee;
 
-public interface TaskRepository extends JpaRepository<Task, Long> {
+public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     
     
     

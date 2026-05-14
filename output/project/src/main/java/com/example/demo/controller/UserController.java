@@ -19,7 +19,7 @@ public class UserController {
     
     
     
-    @PostMapping("")
+    @PostMapping("/api/users")
     public User createUser(@RequestBody User payload) {
         return service.createUser(payload);
     }
@@ -29,7 +29,7 @@ public class UserController {
     
     
     
-    @GetMapping("")
+    @GetMapping("/api/users")
     public List<User> getAllUsers() {
         return service.getAllUsers();
     }
@@ -39,7 +39,7 @@ public class UserController {
     
     
     
-    @GetMapping("/{id}")
+    @GetMapping("/api/users/{id}")
     public User getUserById(@PathVariable Long id) {
         return service.getUserById(id);
     }
@@ -49,7 +49,7 @@ public class UserController {
     
     
     
-    @PutMapping("/{id}")
+    @PutMapping("/api/users/{id}")
     public User updateUser(@PathVariable Long id, @RequestBody User payload) {
         return service.updateUser(id, payload);
     }
@@ -59,7 +59,7 @@ public class UserController {
     
     
     
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/api/users/{id}")
     public void deleteUser(@PathVariable Long id) {
         service.deleteUser(id);
     }
