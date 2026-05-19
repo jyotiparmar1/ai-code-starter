@@ -49,6 +49,12 @@ class MCPOrchestrator:
         analysis_data = analysis_result["analysis"]
         print(f"[Orchestrator] Analysis complete with {len(analysis_data.get('entities', []))} entities")
         
+        # Step 2.5: Validate and enhance analysis data
+        print(f"[Orchestrator] Step 2.5: Validating and enhancing analysis...")
+        validation_results = self._validate_and_enhance_analysis(analysis_data, prd_text)
+        analysis_data.update(validation_results)
+        print(f"[Orchestrator] Validation complete - {len(validation_results.get('validation_issues', []))} issues found")
+        
         # Step 3: Generate the Spring Boot project
         print(f"[Orchestrator] Step 3: Generating Spring Boot project...")
         generation_result = self.mcp_server.call_tool("generate_project", analysis_data=analysis_data)
@@ -75,6 +81,53 @@ class MCPOrchestrator:
                 "inputSchema": tool_config.get("inputSchema")
             }
         return tools_info
+
+
+    def _validate_and_enhance_analysis(self, analysis_data: dict, prd_text: str) -> dict:
+        """
+        Validate analysis data and enhance with suggestions.
+        
+        Args:
+            analysis_data: The analysis result from the analyzer
+            prd_text: Original PRD text for dependency suggestions
+            
+        Returns:
+            Dictionary with validation results and enhancements
+        """
+        enhancements = {
+            "validation_issues": [],
+            "validation_suggestions": [],
+            "recommended_dependencies": {},
+            "database_indexes": [],
+            "entity_relationships": []
+        }
+        
+        entities = analysis_data.get("entities", [])
+        
+        # Validate entity designs
+        for entity in entities:
+            entity_validation = self.mcp_server.validate_entity_design(entity)
+            if not entity_validation.get("valid"):
+                enhancements["validation_issues"].extend(entity_validation.get("issues", []))
+            enhancements["validation_suggestions"].extend(entity_validation.get("suggestions", []))
+        
+        # Validate database schema
+        if entities:
+            schema_validation = self.mcp_server.validate_database_schema({"entities": entities})
+            enhancements["validation_issues"].extend(schema_validation.get("issues", []))
+            enhancements["validation_suggestions"].extend(schema_validation.get("suggestions", []))
+            enhancements["database_indexes"] = schema_validation.get("indexes", [])
+            enhancements["entity_relationships"] = schema_validation.get("relationships", [])
+        
+        # Suggest dependencies based on analysis and PRD text
+        features_data = {
+            "requirements": prd_text,
+            "entities": entities
+        }
+        dependency_suggestions = self.mcp_server.suggest_dependencies(features_data)
+        enhancements["recommended_dependencies"] = dependency_suggestions.get("dependencies", {})
+        
+        return enhancements
 
 
 # Create a singleton orchestrator instance

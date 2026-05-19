@@ -28,12 +28,35 @@ def generate(data):
     features_info = infer_features_from_prd(data)
     feature_config = get_feature_config(features_info["enabled"])
     
+    # Merge validation-suggested dependencies
+    validation_deps = data.get("recommended_dependencies", {})
+    if validation_deps:
+        print(f"Merging {len(validation_deps)} validation-suggested dependency categories")
+        merged_deps = feature_config.get("dependencies", []).copy()
+        
+        # Flatten validation dependencies into list format
+        for category, deps in validation_deps.items():
+            if isinstance(deps, list):
+                merged_deps.extend(deps)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_deps = []
+        for dep in merged_deps:
+            if dep not in seen:
+                seen.add(dep)
+                unique_deps.append(dep)
+        
+        feature_config["dependencies"] = unique_deps
+    
     # Generate core components
     generate_main_application(source_root)
     generate_properties(resources_root, feature_config)
     generate_pom(base_path, feature_config)
     generate_feature_configs(source_root, resources_root, feature_config)
+    # Generate inference summary with additional context
     generate_inference_summary(base_path, data, features_info)
+    generate_project_readme(base_path, data)
 
     # Generate entity-specific components
     for entity in data.get("entities", []):
@@ -349,6 +372,64 @@ def generate_inference_summary(base_path, data, features_info=None):
             lines.append(f"  - {feature}")
         lines.append("")
     
+    # Add validation results
+    validation_issues = data.get("validation_issues", [])
+    validation_suggestions = data.get("validation_suggestions", [])
+    recommended_deps = data.get("recommended_dependencies", {})
+    
+    if validation_issues:
+        lines.append("=== VALIDATION ISSUES ===")
+        for issue in validation_issues:
+            lines.append(f"  - {issue}")
+        lines.append("")
+    
+    if validation_suggestions:
+        lines.append("=== VALIDATION SUGGESTIONS ===")
+        for suggestion in validation_suggestions:
+            lines.append(f"  - {suggestion}")
+        lines.append("")
+    
+    if recommended_deps:
+        lines.append("=== RECOMMENDED DEPENDENCIES ===")
+        for category, deps in recommended_deps.items():
+            if deps:
+                lines.append(f"{category.title()}:")
+                for dep in deps:
+                    lines.append(f"  - {dep}")
+                lines.append("")
+    
+    # Add API best practices
+    try:
+        from .mcp_server import get_api_best_practices
+        api_practices = get_api_best_practices()
+        lines.append("=== API BEST PRACTICES ===")
+        lines.append(api_practices)
+        lines.append("")
+    except Exception:
+        pass  # Skip if MCP server not available
+    
+    # Add project structure recommendations
+    try:
+        from .mcp_server import generate_code_structure
+        project_name = data.get('project_name', 'GeneratedProject')
+        structure_info = generate_code_structure(project_name)
+        lines.append("=== RECOMMENDED PROJECT STRUCTURE ===")
+        structure = structure_info.get('structure', {})
+        for folder, contents in structure.items():
+            lines.append(f"{folder}/")
+            if isinstance(contents, dict):
+                for subfolder, files in contents.items():
+                    lines.append(f"  {subfolder}/")
+                    if isinstance(files, list):
+                        for file in files:
+                            lines.append(f"    - {file}")
+            elif isinstance(contents, list):
+                for item in contents:
+                    lines.append(f"  - {item}")
+            lines.append("")
+    except Exception:
+        pass  # Skip if MCP server not available
+    
     lines.append("=== INFERRED ENTITIES AND OPERATIONS ===")
     for entity in data.get("entities", []):
         lines.append(f"- Entity: {entity['name']}")
@@ -371,3 +452,71 @@ def zip_project(folder_path, zip_path):
             for file in files:
                 full_path = os.path.join(root, file)
                 zipf.write(full_path, os.path.relpath(full_path, folder_path))
+
+
+def generate_project_readme(base_path, data):
+    """Generate a README.md file for the generated Spring Boot project."""
+    project_name = data.get('project_name', 'GeneratedProject')
+    
+    lines = [f"# {project_name}", ""]
+    lines.append("This Spring Boot project was auto-generated from PRD requirements.")
+    lines.append("")
+    
+    # Add API best practices
+    try:
+        from .mcp_server import get_api_best_practices
+        api_practices = get_api_best_practices()
+        lines.append("## API Best Practices")
+        lines.append("")
+        lines.append(api_practices)
+        lines.append("")
+    except Exception:
+        pass
+    
+    # Add project structure
+    try:
+        from .mcp_server import generate_code_structure
+        structure_info = generate_code_structure(project_name)
+        lines.append("## Recommended Project Structure")
+        lines.append("")
+        structure = structure_info.get('structure', {})
+        for folder, contents in structure.items():
+            lines.append(f"### {folder}/")
+            if isinstance(contents, dict):
+                for subfolder, files in contents.items():
+                    lines.append(f"- **{subfolder}/**")
+                    if isinstance(files, list):
+                        for file in files:
+                            lines.append(f"  - {file}")
+            elif isinstance(contents, list):
+                for item in contents:
+                    lines.append(f"- {item}")
+            lines.append("")
+    except Exception:
+        pass
+    
+    # Add basic setup instructions
+    lines.append("## Getting Started")
+    lines.append("")
+    lines.append("1. Ensure you have Java 17+ and Maven installed")
+    lines.append("2. Run `mvn clean install`")
+    lines.append("3. Run `mvn spring-boot:run`")
+    lines.append("")
+    lines.append("## Features")
+    lines.append("")
+    
+    # Add enabled features
+    features_info = data.get('features_info', {})
+    if features_info:
+        enabled_features = features_info.get('enabled', [])
+        if enabled_features:
+            for feature in enabled_features:
+                lines.append(f"- {feature}")
+        else:
+            lines.append("- Basic CRUD operations")
+    else:
+        lines.append("- Basic CRUD operations")
+    
+    lines.append("")
+    
+    write_file(os.path.join(base_path, "README.md"), "\n".join(lines))

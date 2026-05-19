@@ -98,6 +98,48 @@ class MCPServer:
                     "required": ["project_name"]
                 },
                 "handler": self.generate_code_structure
+            },
+            "validate_entity_design": {
+                "description": "Validate entity design and fields for Spring Boot generation",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "entity_data": {
+                            "type": "object",
+                            "description": "Entity metadata to validate"
+                        }
+                    },
+                    "required": ["entity_data"]
+                },
+                "handler": self.validate_entity_design
+            },
+            "validate_database_schema": {
+                "description": "Validate relational database design, normalization, and indexing",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "entities": {
+                            "type": "object",
+                            "description": "Dictionary containing entities and their relationships"
+                        }
+                    },
+                    "required": ["entities"]
+                },
+                "handler": self.validate_database_schema
+            },
+            "suggest_dependencies": {
+                "description": "Recommend Maven dependencies based on detected features",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "features": {
+                            "type": "object",
+                            "description": "Dictionary containing detected features and requirements"
+                        }
+                    },
+                    "required": ["features"]
+                },
+                "handler": self.suggest_dependencies
             }
         }
 

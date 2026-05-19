@@ -1,0 +1,7 @@
+{
+  "name": "Debug Streamlit",
+  "type": "python",
+  "request": "launch",
+  "program": "${workspaceFolder}/.venv/Scripts/streamlit.exe",
+  "args": ["run", "streamlit_app.py"]
+}
