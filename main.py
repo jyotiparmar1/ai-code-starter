@@ -43,7 +43,7 @@ async def generate(file: UploadFile):
         project_name = os.path.splitext(file.filename)[0].replace("-", "_")
         
         # Run the MCP pipeline through the orchestrator
-        zip_path = orchestrator.run_pipeline(file_path, project_name)
+        zip_path = await orchestrator.run_pipeline_async(file_path, project_name)
         
         return {
             "success": True,
@@ -70,7 +70,7 @@ async def run_pipeline_endpoint(request: PipelineRequest):
                 detail=f"File not found: {request.file_path}"
             )
         
-        zip_path = orchestrator.run_pipeline(request.file_path, request.project_name)
+        zip_path = await orchestrator.run_pipeline_async(request.file_path, request.project_name)
         
         return {
             "success": True,
@@ -88,7 +88,7 @@ async def run_pipeline_endpoint(request: PipelineRequest):
 async def get_mcp_tools():
     """Get information about available MCP tools"""
     try:
-        tools_info = orchestrator.get_tool_info()
+        tools_info = await orchestrator.get_tool_info_async()
         return {
             "success": True,
             "tools": tools_info,
@@ -104,7 +104,7 @@ async def get_mcp_tools():
 @app.get("/mcp/api-practices")
 async def api_best_practices():
     try:
-        practices = orchestrator.mcp_server.call_tool("get_api_best_practices")
+        practices = (await orchestrator.mcp_server.call_tool_async("get_api_best_practices"))["result"]
         return {
             "success": True,
             "practices": practices
@@ -116,7 +116,7 @@ async def api_best_practices():
 @app.post("/mcp/context")
 async def mcp_context(request: MCPContextRequest):
     try:
-        context = orchestrator.mcp_server.call_tool("get_spring_boot_context", requirements=request.requirements)
+        context = (await orchestrator.mcp_server.call_tool_async("get_spring_boot_context", requirements=request.requirements))["result"]
         return {
             "success": True,
             "context": context
@@ -128,7 +128,7 @@ async def mcp_context(request: MCPContextRequest):
 @app.post("/mcp/project-structure")
 async def project_structure(request: ProjectStructureRequest):
     try:
-        structure = orchestrator.mcp_server.call_tool("get_project_structure", project_name=request.project_name)
+        structure = await orchestrator.mcp_server.call_tool_async("get_project_structure", project_name=request.project_name)
         return {
             "success": True,
             "structure": structure
