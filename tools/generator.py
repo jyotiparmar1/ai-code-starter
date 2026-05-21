@@ -99,6 +99,7 @@ def write_file(path, content):
 
 def normalize_entity(entity: dict):
     entity["name"] = normalize_java_name(entity.get("name", "GeneratedEntity"))
+    entity["table_name"] = entity.get("table_name", default_table_name(entity["name"]))
     entity["fields"] = entity.get("fields", []) or [{"name": "name", "type": "String"}]
     for field in entity["fields"]:
         field["name"] = sanitize_field_name(field.get("name", "field"))
@@ -138,6 +139,13 @@ def sanitize_field_name(name: str) -> str:
     if sanitized and sanitized[0].isdigit():
         sanitized = "field" + sanitized
     return sanitized
+
+
+def default_table_name(entity_name: str) -> str:
+    name = entity_name.lower()
+    if name.endswith("s"):
+        return name
+    return f"{name}s"
 
 
 def normalize_operation(operation: dict, entity_name: str) -> dict:

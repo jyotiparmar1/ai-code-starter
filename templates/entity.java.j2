@@ -3,6 +3,7 @@ package {{ package }}.entity;
 import jakarta.persistence.*;
 
 @Entity
+@Table(name = "{{ entity.table_name }}")
 public class {{ entity.name }} {
 
     @Id
