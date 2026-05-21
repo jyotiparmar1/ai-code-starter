@@ -137,6 +137,45 @@ async def project_structure(request: ProjectStructureRequest):
         raise HTTPException(status_code=500, detail=f"Could not generate project structure: {str(e)}")
 
 
+@app.post("/mcp/validate-entity")
+async def validate_entity(request: dict):
+    """Validate entity design"""
+    try:
+        validation = orchestrator.mcp_server.call_tool("validate_entity_design", entity_data=request)
+        return {
+            "success": True,
+            "validation": validation
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not validate entity: {str(e)}")
+
+
+@app.post("/mcp/validate-database")
+async def validate_database(request: dict):
+    """Validate database schema"""
+    try:
+        validation = orchestrator.mcp_server.call_tool("validate_database_schema", entities=request)
+        return {
+            "success": True,
+            "validation": validation
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not validate database schema: {str(e)}")
+
+
+@app.post("/mcp/suggest-dependencies")
+async def suggest_dependencies_endpoint(request: dict):
+    """Suggest Maven dependencies"""
+    try:
+        suggestions = orchestrator.mcp_server.call_tool("suggest_dependencies", features=request)
+        return {
+            "success": True,
+            "suggestions": suggestions
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not suggest dependencies: {str(e)}")
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
