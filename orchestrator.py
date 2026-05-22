@@ -3,7 +3,7 @@ Orchestrates the parser → analyzer → generator workflow via MCP server tools
 """
 
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from tools.mcp_server import MCPServer
 
@@ -51,6 +51,82 @@ class MCPOrchestrator:
 
         zip_path = generation_result["zip_path"]
         print(f"[Orchestrator] Pipeline complete: {zip_path}")
+        return zip_path
+
+    async def run_pipeline_with_jira_async(
+        self,
+        jira_issue_key: str,
+        project_name: str = "generated-project",
+        prd_file_path: Optional[str] = None,
+    ) -> str:
+        """Pipeline using a JIRA issue as primary input, optionally merged with a PRD file."""
+        print(f"[Orchestrator] Starting JIRA pipeline for {jira_issue_key}")
+
+        print("[Orchestrator] Step 1: Fetching JIRA issue...")
+        jira_result = await self.mcp_server.call_tool_async(
+            "fetch_jira_issue", issue_key=jira_issue_key
+        )
+        if not jira_result.get("success"):
+            raise Exception(f"JIRA fetch failed: {jira_result.get('error')}")
+        print(f"[Orchestrator] Fetched: {jira_result.get('summary', '')}")
+
+        combined_text = jira_result["content"]
+        project_key = jira_result.get("project_key", "")
+
+        print("[Orchestrator] Step 2: Fetching JIRA project context...")
+        ctx_result = await self.mcp_server.call_tool_async(
+            "fetch_jira_project_context", project_key=project_key
+        )
+        if ctx_result.get("success"):
+            sprint_issues = ctx_result.get("sprint_issues", [])
+            if sprint_issues:
+                lines = [
+                    f"- [{i['key']}] {i['summary']} ({i['type']}, {i['status']})"
+                    for i in sprint_issues
+                ]
+                combined_text += "\n\n## Sprint Context\n" + "\n".join(lines)
+
+        if prd_file_path:
+            print("[Orchestrator] Step 3: Merging PRD file...")
+            parse_result = await self.mcp_server.call_tool_async(
+                "parse_prd", file_path=prd_file_path
+            )
+            if parse_result.get("success") and parse_result.get("content"):
+                combined_text += "\n\n## Additional Requirements (PRD)\n" + parse_result["content"]
+
+        print("[Orchestrator] Step 4: Analyzing combined requirements...")
+        analysis_result = await self.mcp_server.call_tool_async(
+            "analyze_prd", prd_text=combined_text, project_name=project_name
+        )
+        if not analysis_result.get("success"):
+            raise Exception(f"Analysis failed: {analysis_result.get('error')}")
+        analysis_data = analysis_result["analysis"]
+        print(f"[Orchestrator] Found {len(analysis_data.get('entities', []))} entities")
+
+        print("[Orchestrator] Step 5: Generating Spring Boot project...")
+        generation_result = await self.mcp_server.call_tool_async(
+            "generate_project", analysis_data=analysis_data
+        )
+        if not generation_result.get("success"):
+            raise Exception(f"Generation failed: {generation_result.get('error')}")
+        zip_path = generation_result["zip_path"]
+
+        print("[Orchestrator] Step 6: Posting JIRA comment...")
+        entities = [e.get("name", "") for e in analysis_data.get("entities", [])]
+        inference_notes = analysis_data.get("inference_notes", [])
+        comment_result = await self.mcp_server.call_tool_async(
+            "post_jira_comment",
+            issue_key=jira_issue_key,
+            project_name=project_name,
+            entities=entities,
+            features=inference_notes,
+        )
+        if comment_result.get("success"):
+            print(f"[Orchestrator] Comment posted: {comment_result.get('comment_id')}")
+        else:
+            print(f"[Orchestrator] Warning: comment not posted: {comment_result.get('error')}")
+
+        print(f"[Orchestrator] JIRA pipeline complete: {zip_path}")
         return zip_path
 
     def run_pipeline(self, file_path: str, project_name: str = "generated-project"):

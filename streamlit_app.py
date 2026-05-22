@@ -45,6 +45,38 @@ def call_api(endpoint: str, method: str = "GET", data: dict = None, files: dict 
         st.error(f"❌ API call failed: {str(e)}")
         return None
 
+def _show_generation_result(result):
+    """Render the download button and file list for a completed generation."""
+    if not result or "zip_file" not in result:
+        st.error("Generation did not return a zip file.")
+        return
+
+    zip_path = result["zip_file"]
+    if not os.path.exists(zip_path):
+        st.error("Generated zip file not found on server.")
+        return
+
+    with open(zip_path, "rb") as f:
+        zip_data = f.read()
+
+    st.success("✅ Code generation completed!")
+    st.download_button(
+        label="📦 Download Generated Code",
+        data=zip_data,
+        file_name="generated_spring_boot_app.zip",
+        mime="application/zip",
+        use_container_width=True,
+    )
+
+    with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
+        file_list = zf.namelist()
+        st.subheader("📁 Generated Files")
+        for fname in sorted(file_list)[:20]:
+            st.code(fname, language=None)
+        if len(file_list) > 20:
+            st.text(f"... and {len(file_list) - 20} more files")
+
+
 def main():
 
     st.title("🚀 AI Code Generator")
@@ -57,11 +89,13 @@ def main():
         # PRD input methods
         input_method = st.radio(
             "Choose input method:",
-            ["Text Input", "File Upload"],
+            ["Text Input", "File Upload", "JIRA Issue"],
             horizontal=True
         )
 
         prd_text = ""
+        jira_issue_key = ""
+        jira_prd_file = None
 
         if input_method == "Text Input":
             prd_text = st.text_area(
@@ -74,7 +108,7 @@ def main():
     Users should have name, email, and role fields."""
             )
 
-        else:
+        elif input_method == "File Upload":
             uploaded_file = st.file_uploader(
                 "Upload PRD document:",
                 type=["txt", "md", "docx", "doc", "pdf"],
@@ -147,70 +181,85 @@ def main():
                 except Exception as e:
                     st.error(f"Error reading file: {str(e)}")
 
+        else:  # JIRA Issue
+            st.markdown("Enter a JIRA issue key (e.g. `PROJ-123`). The issue description and sprint context will be used as requirements.")
+            jira_issue_key = st.text_input(
+                "JIRA Issue Key",
+                placeholder="PROJ-123",
+            ).strip()
+            jira_prd_file = st.file_uploader(
+                "Optional: also upload a PRD file to merge with JIRA content",
+                type=["txt", "md", "docx", "pdf"],
+                help="When provided, its content is appended to the JIRA issue requirements.",
+            )
+
         # Generate button
         if st.button("🚀 Generate Code", type="primary", use_container_width=True):
+
+            # ── JIRA path ──────────────────────────────────────────────────────
+            if input_method == "JIRA Issue":
+                if not jira_issue_key:
+                    st.error("Please enter a JIRA issue key.")
+                    return
+
+                with st.spinner(f"⚙️ Generating from JIRA issue {jira_issue_key}..."):
+                    try:
+                        form_data = {
+                            "issue_key": (None, jira_issue_key),
+                            "project_name": (None, jira_issue_key.replace("-", "_").lower()),
+                        }
+                        if jira_prd_file:
+                            form_data["file"] = (
+                                jira_prd_file.name,
+                                jira_prd_file.read(),
+                                "application/octet-stream",
+                            )
+                        response = requests.post(
+                            f"{API_BASE_URL}/generate/jira",
+                            files=form_data,
+                            timeout=300,
+                        )
+                        response.raise_for_status()
+                        result = response.json()
+                    except requests.exceptions.ConnectionError:
+                        st.error("Cannot connect to API. Make sure the FastAPI backend is running.")
+                        return
+                    except requests.exceptions.HTTPError as e:
+                        st.error(f"API error {response.status_code}: {response.text}")
+                        return
+                    except Exception as e:
+                        st.error(f"Request failed: {str(e)}")
+                        return
+
+                _show_generation_result(result)
+                return
+
+            # ── PRD path ───────────────────────────────────────────────────────
             if not prd_text.strip():
                 st.error("Please provide PRD content first!")
                 return
 
             with st.spinner("🔍 Analyzing requirements..."):
-                # Get MCP context first
                 context_result = call_api("/mcp/context", "POST", {"requirements": prd_text})
-                if context_result:
-                    context = context_result.get("context", "").strip()
-                    # if context:
-                    #     st.success("✅ MCP context loaded")
-                    #     with st.expander("MCP Context overview", expanded=False):
-                    #         st.write(context)
-                    # else:
-                    #     st.warning("MCP did not return context text.")
 
             with st.spinner("⚙️ Generating Spring Boot application..."):
-                # Create temporary file for API
+                result = None
+                temp_file_path = None
                 temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
                 try:
                     temp_file.write(prd_text)
                     temp_file.close()
                     temp_file_path = temp_file.name
 
-                    # Call the generate endpoint
                     with open(temp_file_path, 'rb') as f:
                         files = {'file': ('prd.txt', f, 'text/plain')}
                         result = call_api("/generate", "POST", files=files)
 
-                    if result and "zip_file" in result:
-                        zip_path = result["zip_file"]
-
-                        # Read and provide download
-                        if os.path.exists(zip_path):
-                            with open(zip_path, "rb") as f:
-                                zip_data = f.read()
-
-                            st.success("✅ Code generation completed!")
-                            st.download_button(
-                                label="📦 Download Generated Code",
-                                data=zip_data,
-                                file_name="generated_spring_boot_app.zip",
-                                mime="application/zip",
-                                use_container_width=True
-                            )
-
-                            # Show zip contents
-                            with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
-                                file_list = zf.namelist()
-                                st.subheader("📁 Generated Files")
-                                for file in sorted(file_list)[:20]:  # Show first 20 files
-                                    st.code(file, language=None)
-                                if len(file_list) > 20:
-                                    st.text(f"... and {len(file_list) - 20} more files")
-
-                        else:
-                            st.error("Generated zip file not found")
-
                 finally:
-                    # Clean up temp file
-                    if os.path.exists(temp_file_path):
+                    if temp_file_path and os.path.exists(temp_file_path):
                         os.unlink(temp_file_path)
+
+                _show_generation_result(result)
 
     # Footer
     st.markdown("---")

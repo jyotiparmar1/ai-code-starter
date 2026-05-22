@@ -1,4 +1,5 @@
-from fastapi import FastAPI, UploadFile, HTTPException
+from fastapi import FastAPI, UploadFile, HTTPException, Form, File
+from typing import Optional
 import os
 from orchestrator import get_orchestrator
 from pydantic import BaseModel
@@ -174,6 +175,40 @@ async def suggest_dependencies_endpoint(request: dict):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not suggest dependencies: {str(e)}")
+
+
+@app.post("/generate/jira")
+async def generate_from_jira(
+    issue_key: str = Form(...),
+    project_name: str = Form("generated-project"),
+    file: Optional[UploadFile] = File(None),
+):
+    """Generate a Spring Boot project from a JIRA issue, optionally merged with a PRD file."""
+    prd_file_path = None
+    try:
+        if file:
+            contents = await file.read()
+            if contents:
+                prd_file_path = f"temp_jira_{file.filename}"
+                with open(prd_file_path, "wb") as f:
+                    f.write(contents)
+
+        zip_path = await orchestrator.run_pipeline_with_jira_async(
+            jira_issue_key=issue_key,
+            project_name=project_name,
+            prd_file_path=prd_file_path,
+        )
+
+        return {
+            "success": True,
+            "zip_file": zip_path,
+            "message": f"Project generated from JIRA issue {issue_key}",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"JIRA generation failed: {str(e)}")
+    finally:
+        if prd_file_path and os.path.exists(prd_file_path):
+            os.remove(prd_file_path)
 
 
 @app.get("/health")

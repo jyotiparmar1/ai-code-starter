@@ -11,6 +11,7 @@ from fastmcp.server.server import FastMCP
 from tools.parser import parse
 from tools.analyzer import analyze
 from tools.generator import generate
+from tools.jira_client import JiraClient
 
 mcp_app = FastMCP(
     name="spring_boot_mcp_server",
@@ -524,6 +525,132 @@ def _generate_pom_xml(dependencies: Dict[str, List[str]]) -> str:
         xml_parts.append("")
     xml_parts.append("    </dependencies>")
     return "\n".join(xml_parts)
+
+
+@mcp_app.tool(
+    name="fetch_jira_issue",
+    title="Fetch JIRA Issue",
+    description="Fetch a JIRA issue by key and extract its content for use as PRD input.",
+    output_schema={
+        "type": "object",
+        "properties": {
+            "success": {"type": "boolean"},
+            "issue_key": {"type": "string"},
+            "summary": {"type": "string"},
+            "issue_type": {"type": "string"},
+            "status": {"type": "string"},
+            "project_key": {"type": "string"},
+            "content": {"type": "string"},
+            "length": {"type": "integer"},
+            "error": {"type": "string"},
+        },
+        "required": ["success"],
+        "additionalProperties": False,
+    },
+)
+def fetch_jira_issue(issue_key: str) -> Dict[str, Any]:
+    try:
+        client = JiraClient()
+        issue = client.get_issue(issue_key)
+        fields = issue.get("fields", {})
+        content = client.extract_text_from_issue(issue)
+        return {
+            "success": True,
+            "issue_key": issue_key,
+            "summary": fields.get("summary", ""),
+            "issue_type": fields.get("issuetype", {}).get("name", ""),
+            "status": fields.get("status", {}).get("name", ""),
+            "project_key": fields.get("project", {}).get("key", ""),
+            "content": content,
+            "length": len(content),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e), "issue_key": issue_key}
+
+
+@mcp_app.tool(
+    name="fetch_jira_project_context",
+    title="Fetch JIRA Project Context",
+    description="Fetch JIRA project metadata and open-sprint issues for context.",
+    output_schema={
+        "type": "object",
+        "properties": {
+            "success": {"type": "boolean"},
+            "project_name": {"type": "string"},
+            "project_key": {"type": "string"},
+            "description": {"type": "string"},
+            "sprint_issues": {"type": "array", "items": {"type": "object"}},
+            "error": {"type": "string"},
+        },
+        "required": ["success"],
+        "additionalProperties": False,
+    },
+)
+def fetch_jira_project_context(project_key: str) -> Dict[str, Any]:
+    try:
+        client = JiraClient()
+        project = client.get_project(project_key)
+        sprint_issues = client.search_issues(
+            jql=f"project = {project_key} AND sprint in openSprints() ORDER BY created DESC",
+            max_results=20,
+        )
+        return {
+            "success": True,
+            "project_name": project.get("name", ""),
+            "project_key": project_key,
+            "description": project.get("description") or "",
+            "sprint_issues": [
+                {
+                    "key": i["key"],
+                    "summary": i["fields"]["summary"],
+                    "type": i["fields"]["issuetype"]["name"],
+                    "status": i["fields"]["status"]["name"],
+                }
+                for i in sprint_issues
+            ],
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e), "project_key": project_key}
+
+
+@mcp_app.tool(
+    name="post_jira_comment",
+    title="Post JIRA Comment",
+    description="Post a generation summary comment to a JIRA issue.",
+    output_schema={
+        "type": "object",
+        "properties": {
+            "success": {"type": "boolean"},
+            "comment_id": {"type": "string"},
+            "issue_key": {"type": "string"},
+            "error": {"type": "string"},
+        },
+        "required": ["success"],
+        "additionalProperties": False,
+    },
+)
+def post_jira_comment(
+    issue_key: str,
+    project_name: str,
+    entities: List[str],
+    features: List[str],
+) -> Dict[str, Any]:
+    try:
+        client = JiraClient()
+        adf_body = JiraClient.build_comment_adf(
+            project_name=project_name,
+            entities=entities,
+            features=features,
+            issue_key=issue_key,
+        )
+        result = client.add_comment(issue_key, adf_body)
+        return {
+            "success": True,
+            "comment_id": result.get("id", ""),
+            "issue_key": issue_key,
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e), "issue_key": issue_key}
 
 
 class MCPServer:
