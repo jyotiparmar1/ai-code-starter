@@ -10,9 +10,9 @@ load_dotenv()
 
 class JiraClient:
     def __init__(self):
-        self.base_url = os.getenv("JIRA_BASE_URL", "").rstrip("/")
-        self.email = os.getenv("JIRA_USER_EMAIL", "")
-        self.api_token = os.getenv("JIRA_API_TOKEN", "")
+        self.base_url = os.getenv("JIRA_BASE_URL", "").strip().rstrip("/")
+        self.email = os.getenv("JIRA_USER_EMAIL", "").strip()
+        self.api_token = os.getenv("JIRA_API_TOKEN", "").strip()
         if not all([self.base_url, self.email, self.api_token]):
             raise ValueError(
                 "JIRA_BASE_URL, JIRA_USER_EMAIL, and JIRA_API_TOKEN environment variables must be set"
