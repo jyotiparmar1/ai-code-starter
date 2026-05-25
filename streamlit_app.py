@@ -45,6 +45,35 @@ def call_api(endpoint: str, method: str = "GET", data: dict = None, files: dict 
         st.error(f"❌ API call failed: {str(e)}")
         return None
 
+def _run_jira_generation(issue_key: str, prd_file=None):
+    """Call /generate/jira and display the result."""
+    with st.spinner(f"⚙️ Generating from JIRA issue {issue_key}..."):
+        try:
+            form_data = {
+                "issue_key": (None, issue_key),
+                "project_name": (None, issue_key.replace("-", "_").lower()),
+            }
+            if prd_file:
+                form_data["file"] = (prd_file.name, prd_file.read(), "application/octet-stream")
+            response = requests.post(
+                f"{API_BASE_URL}/generate/jira",
+                files=form_data,
+                timeout=300,
+            )
+            response.raise_for_status()
+            result = response.json()
+        except requests.exceptions.ConnectionError:
+            st.error("Cannot connect to API. Make sure the FastAPI backend is running.")
+            return
+        except requests.exceptions.HTTPError:
+            st.error(f"API error {response.status_code}: {response.text}")
+            return
+        except Exception as e:
+            st.error(f"Request failed: {str(e)}")
+            return
+    _show_generation_result(result)
+
+
 def _show_generation_result(result):
     """Render the download button and file list for a completed generation."""
     if not result or "zip_file" not in result:
@@ -89,26 +118,16 @@ def main():
         # PRD input methods
         input_method = st.radio(
             "Choose input method:",
-            ["Text Input", "File Upload", "JIRA Issue"],
+            ["File Upload", "JIRA Issue"],
             horizontal=True
         )
 
+        uploaded_file = None
         prd_text = ""
         jira_issue_key = ""
         jira_prd_file = None
 
-        if input_method == "Text Input":
-            prd_text = st.text_area(
-                "Enter your Product Requirements Document:",
-                height=300,
-                placeholder="""Describe your application requirements here...
-
-    Example:
-    Create a user management system with login, registration, and profile management features.
-    Users should have name, email, and role fields."""
-            )
-
-        elif input_method == "File Upload":
+        if input_method == "File Upload":
             uploaded_file = st.file_uploader(
                 "Upload PRD document:",
                 type=["txt", "md", "docx", "doc", "pdf"],
@@ -116,79 +135,63 @@ def main():
             )
 
             if uploaded_file:
-
                 file_type = uploaded_file.name.split(".")[-1].lower()
-
                 try:
-                    # TXT / MD
                     if file_type in ["txt", "md"]:
-
                         file_bytes = uploaded_file.read()
-
-                        encodings = ["utf-8", "utf-16", "latin-1", "cp1252"]
-
-                        for encoding in encodings:
+                        for encoding in ["utf-8", "utf-16", "latin-1", "cp1252"]:
                             try:
                                 prd_text = file_bytes.decode(encoding)
                                 break
                             except UnicodeDecodeError:
                                 continue
-
                         if not prd_text:
                             st.error("Could not decode text file. Please use UTF-8 encoded files.")
 
-                    # DOCX
                     elif file_type == "docx":
                         doc = Document(uploaded_file)
+                        prd_text = "\n".join(para.text for para in doc.paragraphs)
 
-                        paragraphs = []
-                        for para in doc.paragraphs:
-                            paragraphs.append(para.text)
-
-                        prd_text = "\n".join(paragraphs)
-
-                    # PDF
                     elif file_type == "pdf":
                         pdf_reader = PdfReader(uploaded_file)
-
-                        text = []
-                        for page in pdf_reader.pages:
-                            extracted = page.extract_text()
-                            if extracted:
-                                text.append(extracted)
-
-                        prd_text = "\n".join(text)
-
-                    # DOC (legacy Word format)
-                    elif file_type == "doc":
-                        st.warning(
-                            ".doc format is not fully supported. "
-                            "Please convert it to .docx for best results."
+                        prd_text = "\n".join(
+                            page.extract_text() for page in pdf_reader.pages
+                            if page.extract_text()
                         )
+
+                    elif file_type == "doc":
+                        st.warning(".doc format is not fully supported. Please convert to .docx.")
 
                     else:
                         st.error("Unsupported file type.")
 
-                    # Preview content
                     if prd_text:
                         st.text_area(
                             "File content preview:",
                             prd_text[:500] + "..." if len(prd_text) > 500 else prd_text,
                             height=200,
-                            disabled=True
+                            disabled=True,
                         )
-
                 except Exception as e:
                     st.error(f"Error reading file: {str(e)}")
 
-        else:  # JIRA Issue
-            st.markdown("Enter a JIRA issue key (e.g. `PROJ-123`). The issue description and sprint context will be used as requirements.")
+            st.markdown("---")
+            jira_issue_key = st.text_input(
+                "JIRA Issue Key (optional — supplements the PRD)",
+                placeholder="e.g. PROJ-123",
+            ).strip()
+            if jira_issue_key:
+                st.caption("JIRA issue description and sprint context will be merged with the PRD file.")
+
+        else:  # JIRA Issue only
+            st.markdown("Enter a JIRA issue key. The issue description and sprint context will be used as requirements.")
             jira_issue_key = st.text_input(
                 "JIRA Issue Key",
                 placeholder="PROJ-123",
             ).strip()
+            st.markdown("---")
             jira_prd_file = st.file_uploader(
-                "Optional: also upload a PRD file to merge with JIRA content",
+                "PRD document (optional — merged with JIRA content)",
                 type=["txt", "md", "docx", "pdf"],
                 help="When provided, its content is appended to the JIRA issue requirements.",
             )
@@ -196,70 +199,48 @@ def main():
         # Generate button
         if st.button("🚀 Generate Code", type="primary", use_container_width=True):
 
-            # ── JIRA path ──────────────────────────────────────────────────────
+            # ── JIRA-only path ─────────────────────────────────────────────────
             if input_method == "JIRA Issue":
                 if not jira_issue_key:
                     st.error("Please enter a JIRA issue key.")
                     return
+                _run_jira_generation(jira_issue_key, prd_file=jira_prd_file)
+                return
 
-                with st.spinner(f"⚙️ Generating from JIRA issue {jira_issue_key}..."):
+            # ── File Upload path ───────────────────────────────────────────────
+            if not uploaded_file and not jira_issue_key:
+                st.error("Please upload a PRD file or enter a JIRA issue key.")
+                return
+
+            if jira_issue_key:
+                # PRD file + JIRA key → JIRA pipeline (file is supplementary)
+                # Reset stream position — file may have been read during preview
+                if uploaded_file:
+                    uploaded_file.seek(0)
+                _run_jira_generation(jira_issue_key, prd_file=uploaded_file)
+            else:
+                # PRD file only → standard pipeline
+                if not prd_text.strip():
+                    st.error("Could not read content from the uploaded file.")
+                    return
+                with st.spinner("🔍 Analyzing requirements..."):
+                    call_api("/mcp/context", "POST", {"requirements": prd_text})
+                with st.spinner("⚙️ Generating Spring Boot application..."):
+                    result = None
+                    temp_file_path = None
+                    temp_file = tempfile.NamedTemporaryFile(
+                        mode="w", suffix=".txt", delete=False, encoding="utf-8"
+                    )
                     try:
-                        form_data = {
-                            "issue_key": (None, jira_issue_key),
-                            "project_name": (None, jira_issue_key.replace("-", "_").lower()),
-                        }
-                        if jira_prd_file:
-                            form_data["file"] = (
-                                jira_prd_file.name,
-                                jira_prd_file.read(),
-                                "application/octet-stream",
-                            )
-                        response = requests.post(
-                            f"{API_BASE_URL}/generate/jira",
-                            files=form_data,
-                            timeout=300,
-                        )
-                        response.raise_for_status()
-                        result = response.json()
-                    except requests.exceptions.ConnectionError:
-                        st.error("Cannot connect to API. Make sure the FastAPI backend is running.")
-                        return
-                    except requests.exceptions.HTTPError as e:
-                        st.error(f"API error {response.status_code}: {response.text}")
-                        return
-                    except Exception as e:
-                        st.error(f"Request failed: {str(e)}")
-                        return
-
-                _show_generation_result(result)
-                return
-
-            # ── PRD path ───────────────────────────────────────────────────────
-            if not prd_text.strip():
-                st.error("Please provide PRD content first!")
-                return
-
-            with st.spinner("🔍 Analyzing requirements..."):
-                context_result = call_api("/mcp/context", "POST", {"requirements": prd_text})
-
-            with st.spinner("⚙️ Generating Spring Boot application..."):
-                result = None
-                temp_file_path = None
-                temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
-                try:
-                    temp_file.write(prd_text)
-                    temp_file.close()
-                    temp_file_path = temp_file.name
-
-                    with open(temp_file_path, 'rb') as f:
-                        files = {'file': ('prd.txt', f, 'text/plain')}
-                        result = call_api("/generate", "POST", files=files)
-
-                finally:
-                    if temp_file_path and os.path.exists(temp_file_path):
-                        os.unlink(temp_file_path)
-
-                _show_generation_result(result)
+                        temp_file.write(prd_text)
+                        temp_file.close()
+                        temp_file_path = temp_file.name
+                        with open(temp_file_path, "rb") as f:
+                            result = call_api("/generate", "POST", files={"file": ("prd.txt", f, "text/plain")})
+                    finally:
+                        if temp_file_path and os.path.exists(temp_file_path):
+                            os.unlink(temp_file_path)
+                    _show_generation_result(result)
 
     # Footer
     st.markdown("---")
