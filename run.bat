@@ -4,8 +4,8 @@ echo Starting AI Code Generator...
 REM Activate virtual environment
 call .venv\Scripts\activate.bat
 
-REM Install dependencies if needed
-pip install -r requirements.txt
+//REM Install dependencies if needed
+//pip install -r requirements.txt
 
 REM Start FastAPI backend in background
 echo Starting FastAPI backend...

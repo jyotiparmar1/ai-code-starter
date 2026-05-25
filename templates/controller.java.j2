@@ -1,47 +1,126 @@
 package {{ package }}.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import {{ package }}.dto.{{ entity.name }}Request;
+import {{ package }}.dto.{{ entity.name }}Response;
+import {{ package }}.exception.ErrorResponse;
 import {{ package }}.service.{{ entity.name }}Service;
-import {{ package }}.entity.{{ entity.name }};
 
 @RestController
 @RequestMapping("/api/{{ entity.name | lower }}s")
+@Tag(name = "{{ entity.name }} Management", description = "APIs for managing {{ entity.name | lower }}s")
 public class {{ entity.name }}Controller {
 
+    private static final Logger log = LoggerFactory.getLogger({{ entity.name }}Controller.class);
     private final {{ entity.name }}Service service;
 
     public {{ entity.name }}Controller({{ entity.name }}Service service) {
         this.service = service;
     }
 
-    {% for op in entity.operations %}
-    {% set mapping_path = op.relative_path if op.relative_path != '/' else '' %}
-    {% set params = op.params or [] %}
-    {% if op.type == 'CREATE' %}
+    {%- for op in entity.operations %}
+    {%- set mapping_path = op.relative_path if op.relative_path != '/' else '' %}
+    {%- if op.type == 'CREATE' %}
+    @Operation(summary = "Create {{ entity.name | lower }}", description = "{{ op.description }}")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "{{ entity.name }} created successfully",
+            content = @Content(mediaType = "application/json",
+                schema = @Schema(implementation = {{ entity.name }}Response.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid input",
+            content = @Content(mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)))
+    })
     @PostMapping("{{ mapping_path }}")
-    public {{ op.return_type }} {{ op.method_name }}({% for p in params %}{{ p.annotation }} {% if p.annotation == '@PathVariable' and p.path_variable_name != p.name %}("{{ p.path_variable_name }}") {% endif %}{{ p.type }} {{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
-        return service.{{ op.method_name }}({% for p in params %}{{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %});
+    public ResponseEntity<{{ entity.name }}Response> {{ op.method_name }}(
+            @Parameter(description = "{{ entity.name }} details", required = true)
+            @Valid @RequestBody {{ entity.name }}Request request) {
+        log.debug("POST /api/{{ entity.name | lower }}s - Create {{ entity.name | lower }}");
+        {{ entity.name }}Response result = service.{{ op.method_name }}(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
-    {% elif op.type == 'READ' %}
+    {%- elif op.type == 'READ' and op.method_name == ('getAll' ~ entity.name ~ 's') %}
+    @Operation(summary = "Get all {{ entity.name | lower }}s", description = "{{ op.description }}")
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved list",
+        content = @Content(mediaType = "application/json",
+            schema = @Schema(implementation = {{ entity.name }}Response.class)))
     @GetMapping("{{ mapping_path }}")
-    public {{ op.return_type }} {{ op.method_name }}({% for p in params %}{{ p.annotation }} {% if p.annotation == '@PathVariable' and p.path_variable_name != p.name %}("{{ p.path_variable_name }}") {% endif %}{{ p.type }} {{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
-        return service.{{ op.method_name }}({% for p in params %}{{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %});
+    public ResponseEntity<List<{{ entity.name }}Response>> {{ op.method_name }}() {
+        log.debug("GET /api/{{ entity.name | lower }}s - Get all {{ entity.name | lower }}s");
+        return ResponseEntity.ok(service.{{ op.method_name }}());
     }
 
-    {% elif op.type == 'UPDATE' %}
+    {%- elif op.type == 'READ' and 'ById' in op.method_name %}
+    @Operation(summary = "Get {{ entity.name | lower }} by ID", description = "{{ op.description }}")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved",
+            content = @Content(mediaType = "application/json",
+                schema = @Schema(implementation = {{ entity.name }}Response.class))),
+        @ApiResponse(responseCode = "404", description = "{{ entity.name }} not found",
+            content = @Content(mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @GetMapping("{{ mapping_path }}")
+    public ResponseEntity<{{ entity.name }}Response> {{ op.method_name }}(
+            @Parameter(description = "{{ entity.name }} ID", required = true)
+            @PathVariable Long id) {
+        log.debug("GET /api/{{ entity.name | lower }}s/{} - Get by ID", id);
+        return ResponseEntity.ok(service.{{ op.method_name }}(id));
+    }
+
+    {%- elif op.type == 'UPDATE' %}
+    @Operation(summary = "Update {{ entity.name | lower }}", description = "{{ op.description }}")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "{{ entity.name }} updated successfully",
+            content = @Content(mediaType = "application/json",
+                schema = @Schema(implementation = {{ entity.name }}Response.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid input",
+            content = @Content(mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "404", description = "{{ entity.name }} not found",
+            content = @Content(mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)))
+    })
     @PutMapping("{{ mapping_path }}")
-    public {{ op.return_type }} {{ op.method_name }}({% for p in params %}{{ p.annotation }} {% if p.annotation == '@PathVariable' and p.path_variable_name != p.name %}("{{ p.path_variable_name }}") {% endif %}{{ p.type }} {{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
-        return service.{{ op.method_name }}({% for p in params %}{{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %});
+    public ResponseEntity<{{ entity.name }}Response> {{ op.method_name }}(
+            @Parameter(description = "{{ entity.name }} ID", required = true)
+            @PathVariable Long id,
+            @Parameter(description = "Updated {{ entity.name | lower }} details", required = true)
+            @Valid @RequestBody {{ entity.name }}Request request) {
+        log.debug("PUT /api/{{ entity.name | lower }}s/{} - Update {{ entity.name | lower }}", id);
+        return ResponseEntity.ok(service.{{ op.method_name }}(id, request));
     }
 
-    {% elif op.type == 'DELETE' %}
+    {%- elif op.type == 'DELETE' %}
+    @Operation(summary = "Delete {{ entity.name | lower }}", description = "{{ op.description }}")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "204", description = "{{ entity.name }} deleted successfully"),
+        @ApiResponse(responseCode = "404", description = "{{ entity.name }} not found",
+            content = @Content(mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)))
+    })
     @DeleteMapping("{{ mapping_path }}")
-    public void {{ op.method_name }}({% for p in params %}{{ p.annotation }} {% if p.annotation == '@PathVariable' and p.path_variable_name != p.name %}("{{ p.path_variable_name }}") {% endif %}{{ p.type }} {{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
-        service.{{ op.method_name }}({% for p in params %}{{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %});
+    public ResponseEntity<Void> {{ op.method_name }}(
+            @Parameter(description = "{{ entity.name }} ID", required = true)
+            @PathVariable Long id) {
+        log.debug("DELETE /api/{{ entity.name | lower }}s/{} - Delete {{ entity.name | lower }}", id);
+        service.{{ op.method_name }}(id);
+        return ResponseEntity.noContent().build();
     }
 
-    {% endif %}
-    {% endfor %}
+    {%- endif %}
+    {%- endfor %}
 }
