@@ -32,6 +32,7 @@ def generate(data):
     generate_main_application(source_root)
     generate_properties(resources_root, feature_config)
     generate_pom(base_path, feature_config)
+    generate_exception_support(source_root)
     generate_feature_configs(source_root, resources_root, feature_config)
     generate_inference_summary(base_path, data, features_info)
 
@@ -42,6 +43,8 @@ def generate(data):
         generate_repository(entity, source_root)
         generate_service(entity, source_root)
         generate_controller(entity, source_root)
+        generate_dto_request(entity, source_root)
+        generate_dto_response(entity, source_root)
 
     zip_path = "output/project.zip"
     zip_project(base_path, zip_path)
@@ -62,7 +65,7 @@ def create_project_structure(base_path):
         os.makedirs(path, exist_ok=True)
 
     # Create folders for all component types
-    for folder in ["entity", "controller", "service", "repository", "config", "security", "exception"]:
+    for folder in ["entity", "controller", "service", "repository", "config", "security", "exception", "dto"]:
         os.makedirs(os.path.join(package_path, folder), exist_ok=True)
 
     return package_path, resources_path
@@ -90,7 +93,7 @@ def normalize_entity(entity: dict):
         operations = []
     entity["operations"] = [normalize_operation(op, entity["name"]) for op in operations]
     if not entity["operations"]:
-        entity["operations"] = default_crud_operations(entity["name"])
+        entity["operations"] = [normalize_operation(op, entity["name"]) for op in default_crud_operations(entity["name"])]
 
 
 def normalize_java_name(value: str) -> str:
@@ -137,11 +140,12 @@ def normalize_operation(operation: dict, entity_name: str) -> dict:
         method = default_http_method(op_type)
     if not endpoint:
         endpoint = default_endpoint(entity_name, op_type)
+    api_base = f"/api/{entity_name.lower()}s"
     relative_path = endpoint
-    if endpoint.startswith(base):
-        relative_path = endpoint[len(base):]
-        if relative_path == "":
-            relative_path = "/"
+    if endpoint.startswith(api_base):
+        relative_path = endpoint[len(api_base):] or "/"
+    elif endpoint.startswith(base):
+        relative_path = endpoint[len(base):] or "/"
 
     path_vars = re.findall(r"\{([^}]+)\}", endpoint)
     params = []
@@ -234,6 +238,29 @@ def default_crud_operations(entity_name: str) -> list:
     ]
 
 
+def generate_dto_request(entity, source_root):
+    template = env.get_template("dto_request.java.j2")
+    code = template.render(entity=entity, package=BASE_PACKAGE)
+    write_file(os.path.join(source_root, "dto", f"{entity['name']}Request.java"), code)
+
+
+def generate_dto_response(entity, source_root):
+    template = env.get_template("dto_response.java.j2")
+    code = template.render(entity=entity, package=BASE_PACKAGE)
+    write_file(os.path.join(source_root, "dto", f"{entity['name']}Response.java"), code)
+
+
+def generate_exception_support(source_root):
+    for template_name, file_name in [
+        ("ResourceNotFoundException.java.j2", "ResourceNotFoundException.java"),
+        ("ErrorResponse.java.j2", "ErrorResponse.java"),
+        ("GlobalExceptionHandler.java.j2", "GlobalExceptionHandler.java"),
+    ]:
+        template = env.get_template(template_name)
+        code = template.render(package=BASE_PACKAGE)
+        write_file(os.path.join(source_root, "exception", file_name), code)
+
+
 def generate_entity(entity, source_root):
     template = env.get_template("entity.java.j2")
     code = template.render(entity=entity, package=BASE_PACKAGE)
@@ -301,7 +328,7 @@ def determine_output_subdir(template_name: str) -> str:
         return "security"
     if name in {"SecurityConfig", "SwaggerConfig", "OAuth2Config", "CacheConfig"}:
         return "config"
-    if name == "GlobalExceptionHandler":
+    if name in {"GlobalExceptionHandler", "ResourceNotFoundException", "ErrorResponse"}:
         return "exception"
     if name in {"Role", "Permission"}:
         return "entity"

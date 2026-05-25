@@ -1,0 +1,32 @@
+package {{ package }}.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "{{ entity.name }} request payload")
+public class {{ entity.name }}Request {
+
+    {% for field in entity.fields %}
+    {% if field.type == 'String' %}
+    @NotBlank(message = "{{ field.name }} must not be empty")
+    {% else %}
+    @NotNull(message = "{{ field.name }} is required")
+    {% endif %}
+    @Schema(description = "{{ entity.name }}'s {{ field.name }}", example = "sample")
+    private {{ field.type }} {{ field.name }};
+
+    {% endfor %}
+    public {{ entity.name }}Request() {}
+
+    {% for field in entity.fields %}
+    public {{ field.type }} get{{ field.method_name }}() {
+        return {{ field.name }};
+    }
+
+    public void set{{ field.method_name }}({{ field.type }} {{ field.name }}) {
+        this.{{ field.name }} = {{ field.name }};
+    }
+
+    {% endfor %}
+}

@@ -1,38 +1,111 @@
 package {{ package }}.service;
 
 import java.util.List;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import {{ package }}.dto.{{ entity.name }}Request;
+import {{ package }}.dto.{{ entity.name }}Response;
 import {{ package }}.entity.{{ entity.name }};
+import {{ package }}.exception.ResourceNotFoundException;
 import {{ package }}.repository.{{ entity.name }}Repository;
 
 @Service
 public class {{ entity.name }}Service {
 
+    private static final Logger log = LoggerFactory.getLogger({{ entity.name }}Service.class);
     private final {{ entity.name }}Repository repository;
 
     public {{ entity.name }}Service({{ entity.name }}Repository repository) {
         this.repository = repository;
     }
 
-    {% for op in entity.operations %}
-    public {{ op.return_type }} {{ op.method_name }}({% for p in op.params %}{{ p.type }} {{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
-        {% if op.type == 'CREATE' %}
-        return repository.save(payload);
-        {% elif op.type == 'READ' and op.method_name == ('getAll' ~ entity.name ~ 's') %}
-        return repository.findAll();
-        {% elif op.type == 'READ' and op.method_name == ('get' ~ entity.name ~ 'ById') %}
-        return repository.findById(id).orElse(null);
-        {% elif op.type == 'READ' and op.repository_method %}
-        return repository.{{ op.repository_method }}({{ op.repository_param.name }});
-        {% elif op.type == 'READ' %}
-        return repository.findAll();
-        {% elif op.type == 'UPDATE' %}
-        payload.setId(id);
-        return repository.save(payload);
-        {% elif op.type == 'DELETE' %}
-        repository.deleteById(id);
-        {% endif %}
+    {%- for op in entity.operations %}
+    {%- if op.type == 'CREATE' %}
+    public {{ entity.name }}Response {{ op.method_name }}({{ entity.name }}Request request) {
+        log.debug("Creating {{ entity.name | lower }}: {}", request);
+        {{ entity.name }} entity = mapToEntity(request);
+        {{ entity.name }} saved = repository.save(entity);
+        log.info("Created {{ entity.name | lower }} with id: {}", saved.getId());
+        return mapToResponse(saved);
     }
 
-    {% endfor %}
+    {%- elif op.type == 'READ' and op.method_name == ('getAll' ~ entity.name ~ 's') %}
+    public List<{{ entity.name }}Response> {{ op.method_name }}() {
+        log.debug("Getting all {{ entity.name | lower }}s");
+        List<{{ entity.name }}> items = repository.findAll();
+        log.info("Retrieved {} {{ entity.name | lower }}s", items.size());
+        return items.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    {%- elif op.type == 'READ' and 'ById' in op.method_name %}
+    public {{ entity.name }}Response {{ op.method_name }}(Long id) {
+        log.debug("Getting {{ entity.name | lower }} by id: {}", id);
+        {{ entity.name }} entity = repository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("{{ entity.name }}", id));
+        log.info("Retrieved {{ entity.name | lower }} with id: {}", id);
+        return mapToResponse(entity);
+    }
+
+    {%- elif op.type == 'READ' %}
+    {%- set param = op.params[0] if op.params else none %}
+    public List<{{ entity.name }}Response> {{ op.method_name }}({% if param %}{{ param.type }} {{ param.name }}{% endif %}) {
+        log.debug("Searching {{ entity.name | lower }}s");
+        {% if op.repository_method and op.repository_param %}
+        List<{{ entity.name }}> items = repository.{{ op.repository_method }}({{ op.repository_param.name }});
+        {% else %}
+        List<{{ entity.name }}> items = repository.findAll();
+        {% endif %}
+        return items.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    {%- elif op.type == 'UPDATE' %}
+    public {{ entity.name }}Response {{ op.method_name }}(Long id, {{ entity.name }}Request request) {
+        log.debug("Updating {{ entity.name | lower }} with id: {}", id);
+        {{ entity.name }} entity = repository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("{{ entity.name }}", id));
+        updateEntity(entity, request);
+        {{ entity.name }} updated = repository.save(entity);
+        log.info("Updated {{ entity.name | lower }} with id: {}", id);
+        return mapToResponse(updated);
+    }
+
+    {%- elif op.type == 'DELETE' %}
+    public void {{ op.method_name }}(Long id) {
+        log.debug("Deleting {{ entity.name | lower }} with id: {}", id);
+        if (!repository.existsById(id)) {
+            throw new ResourceNotFoundException("{{ entity.name }}", id);
+        }
+        repository.deleteById(id);
+        log.info("Deleted {{ entity.name | lower }} with id: {}", id);
+    }
+
+    {%- endif %}
+    {%- endfor %}
+
+    private {{ entity.name }}Response mapToResponse({{ entity.name }} entity) {
+        {{ entity.name }}Response response = new {{ entity.name }}Response();
+        response.setId(entity.getId());
+        {% for field in entity.fields %}
+        response.set{{ field.method_name }}(entity.get{{ field.method_name }}());
+        {% endfor %}
+        response.setCreatedAt(entity.getCreatedAt());
+        response.setUpdatedAt(entity.getUpdatedAt());
+        return response;
+    }
+
+    private {{ entity.name }} mapToEntity({{ entity.name }}Request request) {
+        {{ entity.name }} entity = new {{ entity.name }}();
+        {% for field in entity.fields %}
+        entity.set{{ field.method_name }}(request.get{{ field.method_name }}());
+        {% endfor %}
+        return entity;
+    }
+
+    private void updateEntity({{ entity.name }} entity, {{ entity.name }}Request request) {
+        {% for field in entity.fields %}
+        entity.set{{ field.method_name }}(request.get{{ field.method_name }}());
+        {% endfor %}
+    }
 }

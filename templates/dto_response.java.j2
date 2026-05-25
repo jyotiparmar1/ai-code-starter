@@ -1,0 +1,40 @@
+package {{ package }}.dto;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDateTime;
+
+@Schema(description = "{{ entity.name }} response payload")
+public class {{ entity.name }}Response {
+
+    @Schema(description = "Unique identifier")
+    private Long id;
+
+    {% for field in entity.fields %}
+    @Schema(description = "{{ entity.name }}'s {{ field.name }}")
+    private {{ field.type }} {{ field.name }};
+
+    {% endfor %}
+    @Schema(description = "Timestamp when record was created")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime createdAt;
+
+    @Schema(description = "Timestamp when record was last updated")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime updatedAt;
+
+    public {{ entity.name }}Response() {}
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    {% for field in entity.fields %}
+    public {{ field.type }} get{{ field.method_name }}() { return {{ field.name }}; }
+    public void set{{ field.method_name }}({{ field.type }} {{ field.name }}) { this.{{ field.name }} = {{ field.name }}; }
+
+    {% endfor %}
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+}

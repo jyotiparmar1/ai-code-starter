@@ -24,12 +24,12 @@ def call_api(endpoint: str, method: str = "GET", data: dict = None, files: dict 
     try:
         url = f"{API_BASE_URL}{endpoint}"
         if method == "GET":
-            response = requests.get(url, timeout=180)
+            response = requests.get(url, timeout=360)
         elif method == "POST":
             if files:
-                response = requests.post(url, files=files, timeout=180)
+                response = requests.post(url, files=files, timeout=360)
             else:
-                response = requests.post(url, json=data, timeout=180)
+                response = requests.post(url, json=data, timeout=360)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.ConnectionError:

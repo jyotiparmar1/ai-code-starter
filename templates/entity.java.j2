@@ -1,6 +1,9 @@
 package {{ package }}.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "{{ entity.table_name }}")
@@ -14,16 +17,17 @@ public class {{ entity.name }} {
     private {{ field.type }} {{ field.name }};
     {% endfor %}
 
-    public {{ entity.name }}() {
-    }
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
 
-    public Long getId() {
-        return id;
-    }
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public {{ entity.name }}() {}
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
     {% for field in entity.fields if field.name != 'id' %}
     public {{ field.type }} get{{ field.method_name }}() {
@@ -35,4 +39,8 @@ public class {{ entity.name }} {
     }
 
     {% endfor %}
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }
