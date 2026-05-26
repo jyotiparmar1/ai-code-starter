@@ -45,14 +45,28 @@ def call_api(endpoint: str, method: str = "GET", data: dict = None, files: dict 
         st.error(f"❌ API call failed: {str(e)}")
         return None
 
-def _run_jira_generation(issue_key: str, prd_file=None):
-    """Call /generate/jira and display the result."""
-    with st.spinner(f"⚙️ Generating from JIRA issue {issue_key}..."):
+def _run_jira_generation(issue_keys_raw: str, prd_file=None):
+    """Call /generate/jira and display the result. issue_keys_raw is comma-separated."""
+    parsed = [k.strip() for k in issue_keys_raw.split(",") if k.strip()]
+    label = ", ".join(parsed)
+    with st.spinner(f"⚙️ Generating from JIRA issue(s): {label}..."):
         try:
+            # Derive project name from the first key
+            first_key = parsed[0] if parsed else "project"
             form_data = {
-                "issue_key": (None, issue_key),
-                "project_name": (None, issue_key.replace("-", "_").lower()),
+                "issue_keys": (None, issue_keys_raw),
+                "project_name": (None, first_key.replace("-", "_").lower()),
             }
+            # Include user-supplied credentials if provided in sidebar
+            jira_url = st.session_state.get("jira_url", "").strip()
+            jira_email = st.session_state.get("jira_email", "").strip()
+            jira_token = st.session_state.get("jira_token", "").strip()
+            if jira_url:
+                form_data["jira_url"] = (None, jira_url)
+            if jira_email:
+                form_data["jira_email"] = (None, jira_email)
+            if jira_token:
+                form_data["jira_token"] = (None, jira_token)
             if prd_file:
                 form_data["file"] = (prd_file.name, prd_file.read(), "application/octet-stream")
             response = requests.post(
@@ -107,6 +121,39 @@ def _show_generation_result(result):
 
 
 def main():
+
+    # ── Sidebar: JIRA credentials ──────────────────────────────────────────────
+    with st.sidebar:
+        st.header("JIRA Configuration")
+        st.caption(
+            "Enter your own credentials here. Leave blank to use the server's "
+            "environment variables (single-user / self-hosted setup)."
+        )
+        st.session_state.jira_url = st.text_input(
+            "JIRA Base URL",
+            value=st.session_state.get("jira_url", ""),
+            placeholder="https://yourcompany.atlassian.net",
+        )
+        st.session_state.jira_email = st.text_input(
+            "Email",
+            value=st.session_state.get("jira_email", ""),
+            placeholder="you@company.com",
+        )
+        st.session_state.jira_token = st.text_input(
+            "API Token",
+            value=st.session_state.get("jira_token", ""),
+            type="password",
+            placeholder="Your Atlassian API token",
+            help="Generate one at id.atlassian.com → Security → API tokens",
+        )
+        if all([
+            st.session_state.get("jira_url"),
+            st.session_state.get("jira_email"),
+            st.session_state.get("jira_token"),
+        ]):
+            st.success("Credentials set")
+        else:
+            st.info("Using server environment credentials")
 
     st.title("🚀 AI Code Generator")
     st.markdown("Generate Spring Boot applications from Product Requirements Documents (PRDs)")
@@ -177,17 +224,17 @@ def main():
 
             st.markdown("---")
             jira_issue_key = st.text_input(
-                "JIRA Issue Key (optional — supplements the PRD)",
-                placeholder="e.g. PROJ-123",
+                "JIRA Issue Key(s) (optional — supplements the PRD)",
+                placeholder="e.g. PROJ-123 or PROJ-123, PROJ-124",
             ).strip()
             if jira_issue_key:
-                st.caption("JIRA issue description and sprint context will be merged with the PRD file.")
+                st.caption("JIRA issue content and sprint context will be merged with the PRD file.")
 
         else:  # JIRA Issue only
-            st.markdown("Enter a JIRA issue key. The issue description and sprint context will be used as requirements.")
+            st.markdown("Enter one or more JIRA issue keys (comma-separated). Their descriptions and sprint context will be used as requirements.")
             jira_issue_key = st.text_input(
-                "JIRA Issue Key",
-                placeholder="PROJ-123",
+                "JIRA Issue Key(s)",
+                placeholder="PROJ-123 or PROJ-123, PROJ-124, PROJ-125",
             ).strip()
             st.markdown("---")
             jira_prd_file = st.file_uploader(
@@ -202,7 +249,7 @@ def main():
             # ── JIRA-only path ─────────────────────────────────────────────────
             if input_method == "JIRA Issue":
                 if not jira_issue_key:
-                    st.error("Please enter a JIRA issue key.")
+                    st.error("Please enter at least one JIRA issue key.")
                     return
                 _run_jira_generation(jira_issue_key, prd_file=jira_prd_file)
                 return

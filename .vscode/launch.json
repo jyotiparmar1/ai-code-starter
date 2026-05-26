@@ -1,12 +1,17 @@
 {
+    "version": "0.2.0",
     "configurations": [
         {
-        "name": "Debug FastAPI",
-        "type": "debugpy",
-        "request": "launch",
-        "module": "uvicorn",
-        "args": ["main:app", "--reload"],
-        "jinja": true
+            "name": "Debug FastAPI",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": ["main:app", "--reload"],
+            "jinja": true,
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "envFile": "${workspaceFolder}/.env",
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
         }
     ]
 }

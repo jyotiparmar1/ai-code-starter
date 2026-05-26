@@ -1,0 +1,63 @@
+Project Overview  
+Build a comprehensive task management application where teams can collaborate on 
+projects and tasks with secure access controls.  
+ 
+## User Entities  
+ 
+1. User 
+- username (unique identifier)  
+- email (contact)  
+- password (hashed)  
+- created_date  
+- last_login  
+- role (admin, manager, member)  
+ 
+2. Project 
+- project_name  
+- description  
+- owner (User reference)  
+- created_date  
+- status (active, archived)  
+- team_members  
+ 
+3. Task 
+- title 
+- description  
+- assigned_to (User reference)  
+- project_id (Project reference)  
+- status (todo, in_progress, completed, blocked)  
+- priority (low, medium, high)  
+- due_date  
+- created_date  
+- updated_date  
+- comments  
+ 
+## Core Requirements  
+ 
+1. Authentication & Security  
+- Users login with JWT tokens  
+- Token-based API authentication  
+- Role-based access control (RBAC):  
+  - Admin: Full system access  
+  - Manager: Project and team management  
+  - Member: Task assignment and updates  
+- Password hashing and validation  
+ 
+2, Database & Persistence  
+- Use PostgreSQL for reliable data persistence  
+- Support for complex queries and transactions  
+- Automatic schema generation from entities  
+ 
+3. API & Documentation  
+- RESTful API with standard CRUD operations  
+- API documentation with Swagger/OpenAPI  
+- Clear error messages for all failure scenarios  
+ 
+## CRUD Operations  
+ 
+Each entity should support:  
+- CREATE: Add new projects, tasks, users  
+- READ: List and retrieve by ID  
+- UPDATE: Edit project details, task status, user information  
+- DELETE: Remove completed tasks, archived projects  
+ 

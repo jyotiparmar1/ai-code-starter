@@ -3,7 +3,7 @@ Orchestrates the parser → analyzer → generator workflow via MCP server tools
 """
 
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 
 from tools.mcp_server import MCPServer
 
@@ -55,27 +55,47 @@ class MCPOrchestrator:
 
     async def run_pipeline_with_jira_async(
         self,
-        jira_issue_key: str,
+        jira_issue_keys: List[str],
         project_name: str = "generated-project",
         prd_file_path: Optional[str] = None,
+        jira_url: Optional[str] = None,
+        jira_email: Optional[str] = None,
+        jira_token: Optional[str] = None,
     ) -> str:
-        """Pipeline using a JIRA issue as primary input, optionally merged with a PRD file."""
-        print(f"[Orchestrator] Starting JIRA pipeline for {jira_issue_key}")
+        """Pipeline using one or more JIRA issues as input, optionally merged with a PRD file."""
+        print(f"[Orchestrator] Starting JIRA pipeline for {jira_issue_keys}")
 
-        print("[Orchestrator] Step 1: Fetching JIRA issue...")
-        jira_result = await self.mcp_server.call_tool_async(
-            "fetch_jira_issue", issue_key=jira_issue_key
-        )
-        if not jira_result.get("success"):
-            raise Exception(f"JIRA fetch failed: {jira_result.get('error')}")
-        print(f"[Orchestrator] Fetched: {jira_result.get('summary', '')}")
+        creds = dict(jira_url=jira_url, jira_email=jira_email, jira_token=jira_token)
 
-        combined_text = jira_result["content"]
-        project_key = jira_result.get("project_key", "")
+        # Step 1: Fetch all JIRA issues and build per-issue metadata
+        print(f"[Orchestrator] Step 1: Fetching {len(jira_issue_keys)} JIRA issue(s)...")
+        issue_meta: List[Dict[str, Any]] = []  # {key, summary, content}
+        project_key = ""
+        combined_text = ""
 
+        for key in jira_issue_keys:
+            result = await self.mcp_server.call_tool_async(
+                "fetch_jira_issue", issue_key=key, **creds
+            )
+            if not result.get("success"):
+                raise Exception(f"JIRA fetch failed for {key}: {result.get('error')}")
+            print(f"[Orchestrator]   Fetched {key}: {result.get('summary', '')}")
+            issue_meta.append({
+                "key": key,
+                "summary": result.get("summary", ""),
+                "content": result.get("content", ""),
+            })
+            if not project_key:
+                project_key = result.get("project_key", "")
+
+        # Combine content from all tickets (labelled by key)
+        for meta in issue_meta:
+            combined_text += f"\n\n## Ticket {meta['key']}: {meta['summary']}\n{meta['content']}"
+
+        # Step 2: Sprint context from the first ticket's project
         print("[Orchestrator] Step 2: Fetching JIRA project context...")
         ctx_result = await self.mcp_server.call_tool_async(
-            "fetch_jira_project_context", project_key=project_key
+            "fetch_jira_project_context", project_key=project_key, **creds
         )
         if ctx_result.get("success"):
             sprint_issues = ctx_result.get("sprint_issues", [])
@@ -86,6 +106,7 @@ class MCPOrchestrator:
                 ]
                 combined_text += "\n\n## Sprint Context\n" + "\n".join(lines)
 
+        # Step 3: Optionally merge PRD file
         if prd_file_path:
             print("[Orchestrator] Step 3: Merging PRD file...")
             parse_result = await self.mcp_server.call_tool_async(
@@ -94,6 +115,7 @@ class MCPOrchestrator:
             if parse_result.get("success") and parse_result.get("content"):
                 combined_text += "\n\n## Additional Requirements (PRD)\n" + parse_result["content"]
 
+        # Step 4: Analyze
         print("[Orchestrator] Step 4: Analyzing combined requirements...")
         analysis_result = await self.mcp_server.call_tool_async(
             "analyze_prd", prd_text=combined_text, project_name=project_name
@@ -101,8 +123,10 @@ class MCPOrchestrator:
         if not analysis_result.get("success"):
             raise Exception(f"Analysis failed: {analysis_result.get('error')}")
         analysis_data = analysis_result["analysis"]
-        print(f"[Orchestrator] Found {len(analysis_data.get('entities', []))} entities")
+        entities_data = analysis_data.get("entities", [])
+        print(f"[Orchestrator] Found {len(entities_data)} entities")
 
+        # Step 5: Generate
         print("[Orchestrator] Step 5: Generating Spring Boot project...")
         generation_result = await self.mcp_server.call_tool_async(
             "generate_project", analysis_data=analysis_data
@@ -111,20 +135,35 @@ class MCPOrchestrator:
             raise Exception(f"Generation failed: {generation_result.get('error')}")
         zip_path = generation_result["zip_path"]
 
-        print("[Orchestrator] Step 6: Posting JIRA comment...")
-        entities = [e.get("name", "") for e in analysis_data.get("entities", [])]
-        inference_notes = analysis_data.get("inference_notes", [])
-        comment_result = await self.mcp_server.call_tool_async(
-            "post_jira_comment",
-            issue_key=jira_issue_key,
-            project_name=project_name,
-            entities=entities,
-            features=inference_notes,
-        )
-        if comment_result.get("success"):
-            print(f"[Orchestrator] Comment posted: {comment_result.get('comment_id')}")
-        else:
-            print(f"[Orchestrator] Warning: comment not posted: {comment_result.get('error')}")
+        # Step 6: Generate LLM summary + post contextual comment to each ticket
+        print(f"[Orchestrator] Step 6: Posting comments to {len(jira_issue_keys)} ticket(s)...")
+        for meta in issue_meta:
+            # Ask LLM to write a comment tailored to this specific ticket
+            print(f"[Orchestrator]   Generating LLM summary for {meta['key']}...")
+            summary_result = await self.mcp_server.call_tool_async(
+                "generate_jira_comment_summary",
+                issue_summary=meta["summary"],
+                issue_content=meta["content"],
+                entities=entities_data,
+            )
+            llm_summary = summary_result.get("summary", "")
+            if not summary_result.get("success"):
+                print(f"[Orchestrator]   LLM summary fallback for {meta['key']}: {summary_result.get('error')}")
+
+            comment_result = await self.mcp_server.call_tool_async(
+                "post_jira_comment",
+                issue_key=meta["key"],
+                project_name=project_name,
+                entities=entities_data,
+                issue_summary=meta["summary"],
+                all_issue_keys=jira_issue_keys,
+                llm_summary=llm_summary,
+                **creds,
+            )
+            if comment_result.get("success"):
+                print(f"[Orchestrator]   Comment posted to {meta['key']}: {comment_result.get('comment_id')}")
+            else:
+                print(f"[Orchestrator]   Warning: comment not posted to {meta['key']}: {comment_result.get('error')}")
 
         print(f"[Orchestrator] JIRA pipeline complete: {zip_path}")
         return zip_path

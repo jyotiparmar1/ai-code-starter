@@ -548,9 +548,14 @@ def _generate_pom_xml(dependencies: Dict[str, List[str]]) -> str:
         "additionalProperties": False,
     },
 )
-def fetch_jira_issue(issue_key: str) -> Dict[str, Any]:
+def fetch_jira_issue(
+    issue_key: str,
+    jira_url: str = None,
+    jira_email: str = None,
+    jira_token: str = None,
+) -> Dict[str, Any]:
     try:
-        client = JiraClient()
+        client = JiraClient(base_url=jira_url, email=jira_email, api_token=jira_token)
         issue = client.get_issue(issue_key)
         fields = issue.get("fields", {})
         content = client.extract_text_from_issue(issue)
@@ -586,9 +591,14 @@ def fetch_jira_issue(issue_key: str) -> Dict[str, Any]:
         "additionalProperties": False,
     },
 )
-def fetch_jira_project_context(project_key: str) -> Dict[str, Any]:
+def fetch_jira_project_context(
+    project_key: str,
+    jira_url: str = None,
+    jira_email: str = None,
+    jira_token: str = None,
+) -> Dict[str, Any]:
     try:
-        client = JiraClient()
+        client = JiraClient(base_url=jira_url, email=jira_email, api_token=jira_token)
         project = client.get_project(project_key)
         sprint_issues = client.search_issues(
             jql=f"project = {project_key} AND sprint in openSprints() ORDER BY created DESC",
@@ -614,6 +624,85 @@ def fetch_jira_project_context(project_key: str) -> Dict[str, Any]:
 
 
 @mcp_app.tool(
+    name="generate_jira_comment_summary",
+    title="Generate JIRA Comment Summary",
+    description="Use LLM to write a contextual comment summary for a JIRA ticket based on its description and what was generated.",
+    output_schema={
+        "type": "object",
+        "properties": {
+            "success": {"type": "boolean"},
+            "summary": {"type": "string"},
+            "error": {"type": "string"},
+        },
+        "required": ["success"],
+        "additionalProperties": False,
+    },
+)
+def generate_jira_comment_summary(
+    issue_summary: str,
+    issue_content: str,
+    entities: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    import os as _os
+    import requests as _req
+
+    api_key = _os.getenv(
+        "OPENROUTER_API_KEY",
+        "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",
+    )
+
+    entity_lines = []
+    for e in entities:
+        name = e.get("name", "Unknown")
+        ops = [o.get("type", "") for o in e.get("operations", []) if o.get("type")]
+        op_str = f" ({', '.join(ops)})" if ops else ""
+        entity_lines.append(f"- {name}{op_str}")
+    entity_desc = "\n".join(entity_lines) if entity_lines else "- No entities detected"
+
+    prompt = f"""You are a software architect reviewing a completed code generation task.
+
+A Spring Boot project was generated from the following JIRA ticket.
+
+Ticket Title: {issue_summary}
+
+Ticket Description:
+{issue_content[:2000]}
+
+What was generated:
+{entity_desc}
+
+Write a concise 2-4 sentence comment to post on this JIRA ticket that:
+- Explains what was generated and how it directly addresses the ticket requirements
+- References specific requirements or acceptance criteria mentioned in the ticket description
+- Connects the generated entities to the business needs described
+- Uses professional language suitable for a development team
+
+Return only the comment text. No markdown formatting, no bullet points, no headers."""
+
+    try:
+        response = _req.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "HTTP-Referer": "http://localhost",
+                "X-Title": "Code Generator",
+            },
+            json={
+                "model": "poolside/laguna-m.1:free",
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=45,
+        )
+        response.raise_for_status()
+        summary = response.json()["choices"][0]["message"]["content"].strip()
+        return {"success": True, "summary": summary}
+    except Exception as e:
+        # Graceful fallback — still post a comment, just without LLM prose
+        fallback = f"Spring Boot project was generated based on the requirements in this ticket: {issue_summary}."
+        return {"success": False, "error": str(e), "summary": fallback}
+
+
+@mcp_app.tool(
     name="post_jira_comment",
     title="Post JIRA Comment",
     description="Post a generation summary comment to a JIRA issue.",
@@ -632,16 +721,23 @@ def fetch_jira_project_context(project_key: str) -> Dict[str, Any]:
 def post_jira_comment(
     issue_key: str,
     project_name: str,
-    entities: List[str],
-    features: List[str],
+    entities: List[Dict[str, Any]],
+    issue_summary: str = "",
+    all_issue_keys: List[str] = None,
+    llm_summary: str = "",
+    jira_url: str = None,
+    jira_email: str = None,
+    jira_token: str = None,
 ) -> Dict[str, Any]:
     try:
-        client = JiraClient()
+        client = JiraClient(base_url=jira_url, email=jira_email, api_token=jira_token)
         adf_body = JiraClient.build_comment_adf(
             project_name=project_name,
             entities=entities,
-            features=features,
             issue_key=issue_key,
+            issue_summary=issue_summary,
+            all_issue_keys=all_issue_keys,
+            llm_summary=llm_summary,
         )
         result = client.add_comment(issue_key, adf_body)
         return {

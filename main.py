@@ -179,13 +179,20 @@ async def suggest_dependencies_endpoint(request: dict):
 
 @app.post("/generate/jira")
 async def generate_from_jira(
-    issue_key: str = Form(...),
+    issue_keys: str = Form(...),
     project_name: str = Form("generated-project"),
+    jira_url: Optional[str] = Form(None),
+    jira_email: Optional[str] = Form(None),
+    jira_token: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
 ):
-    """Generate a Spring Boot project from a JIRA issue, optionally merged with a PRD file."""
+    """Generate a Spring Boot project from one or more JIRA issues (comma-separated keys)."""
     prd_file_path = None
     try:
+        parsed_keys = [k.strip() for k in issue_keys.split(",") if k.strip()]
+        if not parsed_keys:
+            raise HTTPException(status_code=400, detail="No valid JIRA issue keys provided.")
+
         if file:
             contents = await file.read()
             if contents:
@@ -194,15 +201,19 @@ async def generate_from_jira(
                     f.write(contents)
 
         zip_path = await orchestrator.run_pipeline_with_jira_async(
-            jira_issue_key=issue_key,
+            jira_issue_keys=parsed_keys,
             project_name=project_name,
             prd_file_path=prd_file_path,
+            jira_url=jira_url or None,
+            jira_email=jira_email or None,
+            jira_token=jira_token or None,
         )
 
         return {
             "success": True,
             "zip_file": zip_path,
-            "message": f"Project generated from JIRA issue {issue_key}",
+            "issue_keys": parsed_keys,
+            "message": f"Project generated from {len(parsed_keys)} JIRA issue(s): {', '.join(parsed_keys)}",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"JIRA generation failed: {str(e)}")
