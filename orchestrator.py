@@ -178,20 +178,6 @@ class MCPOrchestrator:
             "run_pipeline() cannot be used from a running event loop. Use run_pipeline_async() instead."
         )
 
-    async def get_tool_info_async(self) -> Dict[str, Any]:
-        """Get information about available MCP tools asynchronously."""
-        return await self.mcp_server.get_tool_info_async()
-
-    def get_tool_info(self) -> Dict[str, Any]:
-        """Synchronous wrapper for get_tool_info_async."""
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(self.get_tool_info_async())
-        raise RuntimeError(
-            "get_tool_info() cannot be used from a running event loop. Use get_tool_info_async() instead."
-        )
-
 
 _orchestrator_instance = None
 

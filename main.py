@@ -5,10 +5,6 @@ from orchestrator import get_orchestrator
 from pydantic import BaseModel
 
 
-class ProjectNameRequest(BaseModel):
-    project_name: str
-
-
 class MCPContextRequest(BaseModel):
     requirements: str
 
@@ -85,35 +81,6 @@ async def run_pipeline_endpoint(request: PipelineRequest):
         )
 
 
-@app.get("/mcp/tools")
-async def get_mcp_tools():
-    """Get information about available MCP tools"""
-    try:
-        tools_info = await orchestrator.get_tool_info_async()
-        return {
-            "success": True,
-            "tools": tools_info,
-            "count": len(tools_info)
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to retrieve tools: {str(e)}"
-        )
-
-
-@app.get("/mcp/api-practices")
-async def api_best_practices():
-    try:
-        practices = (await orchestrator.mcp_server.call_tool_async("get_api_best_practices"))["result"]
-        return {
-            "success": True,
-            "practices": practices
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not retrieve API best practices: {str(e)}")
-
-
 @app.post("/mcp/context")
 async def mcp_context(request: MCPContextRequest):
     try:
@@ -138,19 +105,6 @@ async def project_structure(request: ProjectStructureRequest):
         raise HTTPException(status_code=500, detail=f"Could not generate project structure: {str(e)}")
 
 
-@app.post("/mcp/validate-entity")
-async def validate_entity(request: dict):
-    """Validate entity design"""
-    try:
-        validation = orchestrator.mcp_server.call_tool("validate_entity_design", entity_data=request)
-        return {
-            "success": True,
-            "validation": validation
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not validate entity: {str(e)}")
-
-
 @app.post("/mcp/validate-database")
 async def validate_database(request: dict):
     """Validate database schema"""
@@ -162,19 +116,6 @@ async def validate_database(request: dict):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not validate database schema: {str(e)}")
-
-
-@app.post("/mcp/suggest-dependencies")
-async def suggest_dependencies_endpoint(request: dict):
-    """Suggest Maven dependencies"""
-    try:
-        suggestions = orchestrator.mcp_server.call_tool("suggest_dependencies", features=request)
-        return {
-            "success": True,
-            "suggestions": suggestions
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not suggest dependencies: {str(e)}")
 
 
 @app.post("/generate/jira")
