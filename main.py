@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, HTTPException, Form, File
+from fastapi.responses import FileResponse
 from typing import Optional
 import os
 from orchestrator import get_orchestrator
@@ -161,6 +162,15 @@ async def generate_from_jira(
     finally:
         if prd_file_path and os.path.exists(prd_file_path):
             os.remove(prd_file_path)
+
+
+@app.get("/download")
+async def download_zip():
+    """Serve the most recently generated project zip."""
+    zip_path = "output/project.zip"
+    if not os.path.exists(zip_path):
+        raise HTTPException(status_code=404, detail="No generated project found.")
+    return FileResponse(zip_path, filename="generated_spring_boot_app.zip", media_type="application/zip")
 
 
 @app.get("/health")

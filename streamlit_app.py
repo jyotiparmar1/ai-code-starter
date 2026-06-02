@@ -16,8 +16,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# API base URL
-API_BASE_URL = "http://localhost:8000"
+# API base URL — override with API_BASE_URL env var when deployed
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 def call_api(endpoint: str, method: str = "GET", data: dict = None, files: dict = None):
     """Call FastAPI backend"""
@@ -90,17 +90,15 @@ def _run_jira_generation(issue_keys_raw: str, prd_file=None):
 
 def _show_generation_result(result):
     """Render the download button and file list for a completed generation."""
-    if not result or "zip_file" not in result:
-        st.error("Generation did not return a zip file.")
+    if not result or not result.get("success"):
+        st.error("Generation did not return a result.")
         return
 
-    zip_path = result["zip_file"]
-    if not os.path.exists(zip_path):
-        st.error("Generated zip file not found on server.")
+    response = requests.get(f"{API_BASE_URL}/download", timeout=60)
+    if response.status_code != 200:
+        st.error("Failed to download the generated project from the server.")
         return
-
-    with open(zip_path, "rb") as f:
-        zip_data = f.read()
+    zip_data = response.content
 
     st.success("✅ Code generation completed!")
     st.download_button(
